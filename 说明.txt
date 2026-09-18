@@ -1,0 +1,1 @@
+熟悉一下项目，server后端，web后台前端，tauri_tools前台桌面端，docs文档（server和web），api_openai_draw_doc.md绘画文档

@@ -1,0 +1,88 @@
+// Package web
+// @Link  https://github.com/bufanyun/hotgo
+// @Copyright  Copyright (c) 2026 HotGo CLI
+// @Author  Ms <133814250@qq.com>
+// @License  https://github.com/bufanyun/hotgo/blob/master/LICENSE
+// @AutoGenerate Version 2.18.9
+package web
+
+import (
+	"context"
+	"hotgo/api/admin/web/webchannel"
+	"hotgo/internal/service"
+)
+
+var (
+	webChannel = cwebChannel{}
+)
+
+type cwebChannel struct{}
+
+// List 查看栏目管理1列表
+func (c *cwebChannel) List(ctx context.Context, req *webchannel.ListReq) (res *webchannel.ListRes, err error) {
+	list, totalCount, err := service.WebwebChannel().List(ctx, &req.webChannelListInp)
+	if err != nil {
+		return
+	}
+
+	if list == nil {
+		list = []*webin.webChannelListModel{}
+	}
+
+	res = new(webchannel.ListRes)
+	res.List = list
+	res.PageRes.Pack(req, totalCount)
+	return
+}
+
+// Export 导出栏目管理1列表
+func (c *cwebChannel) Export(ctx context.Context, req *webchannel.ExportReq) (res *webchannel.ExportRes, err error) {
+	err = service.WebwebChannel().Export(ctx, &req.webChannelListInp)
+	return
+}
+
+// Edit 更新栏目管理1
+func (c *cwebChannel) Edit(ctx context.Context, req *webchannel.EditReq) (res *webchannel.EditRes, err error) {
+	err = service.WebwebChannel().Edit(ctx, &req.webChannelEditInp)
+	return
+}
+
+// View 获取指定栏目管理1信息
+func (c *cwebChannel) View(ctx context.Context, req *webchannel.ViewReq) (res *webchannel.ViewRes, err error) {
+	data, err := service.WebwebChannel().View(ctx, &req.webChannelViewInp)
+	if err != nil {
+		return
+	}
+
+	res = new(webchannel.ViewRes)
+	res.webChannelViewModel = data
+	return
+}
+
+// Delete 删除栏目管理1
+func (c *cwebChannel) Delete(ctx context.Context, req *webchannel.DeleteReq) (res *webchannel.DeleteRes, err error) {
+	err = service.WebwebChannel().Delete(ctx, &req.webChannelDeleteInp)
+	return
+}
+
+// Status 更新栏目管理1状态
+func (c *cwebChannel) Status(ctx context.Context, req *webchannel.StatusReq) (res *webchannel.StatusRes, err error) {
+	err = service.WebwebChannel().Status(ctx, &req.webChannelStatusInp)
+	return
+}
+
+// TreeOption 获取栏目管理1关系树选项
+func (c *cwebChannel) TreeOption(ctx context.Context, req *webchannel.TreeOptionReq) (res *webchannel.TreeOptionRes, err error) {
+	data, err := service.WebwebChannel().TreeOption(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(data) > 0 {
+		res = (*webchannel.TreeOptionRes)(&data)
+	} else {
+		temp := make(webchannel.TreeOptionRes, 0)
+		res = &temp
+	}
+	return
+}
