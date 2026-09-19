@@ -21,6 +21,7 @@ import (
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gctx"
+	"github.com/gogf/gf/v2/os/gtime"
 	"github.com/gogf/gf/v2/util/gconv"
 )
 
@@ -50,7 +51,7 @@ func (s *sWebArticle) List(ctx context.Context, in *webin.ArticleListInp) (list 
 	if in.Id > 0 {
 		mod = mod.Where(dao.WebArticle.Columns().Id, in.Id)
 	}
-	
+
 	if in.ChannelId > 0 {
 		mod = mod.Where(dao.WebArticle.Columns().ChannelId, in.ChannelId)
 	}
@@ -70,7 +71,7 @@ func (s *sWebArticle) List(ctx context.Context, in *webin.ArticleListInp) (list 
 	if in.Status != "" {
 		mod = mod.Where(dao.WebArticle.Columns().Status, in.Status)
 	}
-	
+
 	if len(in.CreateTime) == 2 {
 		mod = mod.WhereBetween(dao.WebArticle.Columns().CreateTime, in.CreateTime[0], in.CreateTime[1])
 	}
@@ -137,6 +138,11 @@ func (s *sWebArticle) Edit(ctx context.Context, in *webin.ArticleEditInp) (err e
 		}
 
 		// 新增
+		if in.PublishTime == 0 {
+			in.PublishTime = uint64(gtime.Now().Unix())
+		}
+		in.UpdateTime = uint64(gtime.Now().Unix())
+		in.CreateTime = uint64(gtime.Now().Unix())
 		if _, err = s.Model(ctx, &handler.Option{FilterAuth: false}).
 			Fields(webin.ArticleInsertFields{}).
 			Data(in).OmitEmptyData().Insert(); err != nil {
