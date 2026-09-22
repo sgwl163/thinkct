@@ -86,6 +86,7 @@ func (c *cSite) Content(ctx context.Context, req *v1.ContentReq) (res *v1.Conten
 	}
 	res = new(v1.ContentRes)
 	res.Content = data.Content
+	res.Author = data.Author
 	res.Channel = data.Channel
 	res.Breadcrumb = data.Breadcrumb
 	res.RelatedList = data.RelatedList

@@ -1,172 +1,186 @@
-# 前台用户模块开发文档
+# 前台用户接口文档
 
-本文档描述了 HotGo 项目前台用户模块（API端）的结构、开发规范以及提供的接口信息。主要包含用户注册、登录、获取用户信息和退出登录功能。
+本文档说明 HotGo API 端的用户中心接口。所有接口统一返回：
 
-## 1. 目录结构
-
-所有与前台用户相关的代码均遵循 GoFrame 和 HotGo 的规范，主要分布在以下目录中：
-
-```text
-p:\go\hotgo-2.0\server
-├── api
-│   └── api
-│       └── user
-│           ├── v1
-│           │   └── user.go       // 定义 API 的请求参数 (Req) 和响应结果 (Res) 结构体
-│           └── user.go           // 声明前台用户的 Controller 接口 (IUserV1)
-├── internal
-│   ├── controller
-│   │   └── api
-│   │       └── user
-│   │           ├── user.go       // 控制器实现，主要负责接收请求并转发给 Service 层
-│   │           └── user_new.go   // 控制器实例化文件
-│   ├── logic
-│   │   └── user
-│   │       └── api_user.go       // 具体业务逻辑实现（注册、登录、信息获取、退出等），依赖于底层的 dao 和 library
-│   ├── service
-│   │   └── user.go               // 定义了供其他模块调用的服务接口 (IApiUser) 和注册方法
-│   └── router
-│       └── api.go                // 路由注册文件。免鉴权的接口放在中间件之前，需要鉴权的接口放在中间件之后
-└── manifest
-    └── config
-        └── config.yaml           // 配置文件，其中的 `api.exceptLogin` 节点用于配置免登录拦截的路由白名单
+```json
+{"code":0,"message":"操作成功","timestamp":1234567890,"traceID":"xxx","data":{}}
 ```
 
----
+接口基础路径为 `/api`。除明确标注为免登录的接口外，请在请求头中携带访问令牌：
 
-## 2. 接口信息概览
+```text
+Authorization: Bearer <token>
+```
 
-> **说明**：所有接口在请求时如果涉及登录后的操作（例如获取信息、退出登录），均需要在请求头中携带 Token。
-> 
-> **Token 传递方式**：
-> - 请求头 (Header): `Authorization: Bearer <Your_Token>` 或 `userToken: <Your_Token>`
-> - URL 参数 (Query): `?authorization=<Your_Token>` 或 `?userToken=<Your_Token>`
+也兼容 `userToken: <token>` 请求头，或 `authorization`、`userToken` 查询参数。
 
-### 2.1 用户注册
+## 用户资料字段
 
-* **接口路径**：`/api/user/register`
-* **请求方式**：`POST`
-* **鉴权要求**：无需鉴权（已加入配置白名单）
-* **功能描述**：用于新用户注册，注册成功后自动登录并返回 Token 和用户信息。
+用户信息接口中的主要字段如下：
 
-**请求参数 (Body-JSON)**：
-| 字段名 | 类型 | 必填 | 说明 |
-| :--- | :--- | :--- | :--- |
-| username | string | 是 | 用户名 |
-| password | string | 是 | 密码 (6-20位) |
-| nickname | string | 否 | 昵称 |
-| mobile | string | 否 | 手机号 |
-| email | string | 否 | 邮箱 |
-
-**响应结果 (JSON)**：
-| 字段名 | 类型 | 说明 |
-| :--- | :--- | :--- |
-| id | int64 | 用户ID |
-| username | string | 用户名 |
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| id | int64 | 用户 ID |
+| username | string | 用户名，不支持通过用户中心修改 |
 | nickname | string | 昵称 |
-| avatar | string | 头像 |
-| mobile | string | 手机号 |
-| email | string | 邮箱 |
-| money | uint | 余额 |
-| score | uint | 积分 |
-| token | string | 登录令牌 |
-| expire | int64 | Token 过期时间戳 |
-
----
-
-### 2.2 用户登录
-
-* **接口路径**：`/api/user/login`
-* **请求方式**：`POST`
-* **鉴权要求**：无需鉴权（已加入配置白名单）
-* **功能描述**：用户使用账号和明文密码登录，验证通过后返回 Token 和详细信息。
-
-**请求参数 (Body-JSON)**：
-| 字段名 | 类型 | 必填 | 说明 |
-| :--- | :--- | :--- | :--- |
-| username | string | 是 | 用户名 |
-| password | string | 是 | 密码 (明文) |
-
-**响应结果 (JSON)**：
-*(同注册接口的响应字段一致，包含 Token 和用户信息)*
-
----
-
-### 2.3 获取用户信息
-
-* **接口路径**：`/api/user/info`
-* **请求方式**：`GET`
-* **鉴权要求**：**必须携带有效 Token**
-* **功能描述**：通过 Token 解析用户身份，查询并返回最新的用户信息。
-
-**请求参数**：无
-
-**响应结果 (JSON)**：
-| 字段名 | 类型 | 说明 |
-| :--- | :--- | :--- |
-| id | int64 | 用户ID |
-| username | string | 用户名 |
-| nickname | string | 昵称 |
-| avatar | string | 头像 |
-| mobile | string | 手机号 |
-| email | string | 邮箱 |
-| money | uint | 余额 |
-| score | uint | 积分 |
-
----
-
-### 2.4 修改用户信息
-
-* **接口路径**：`/api/user/update`
-* **请求方式**：`POST`
-* **鉴权要求**：**必须携带有效 Token**
-* **功能描述**：修改当前登录用户的资料信息（昵称、头像、手机号、邮箱、性别、生日、签名）。用户名和密码不通过此接口修改。
-
-**请求参数 (Body-JSON)**：
-| 字段名 | 类型 | 必填 | 说明 |
-| :--- | :--- | :--- | :--- |
-| nickname | string | 是 | 昵称 |
-| avatar | string | 是 | 头像 |
-| mobile | string | 否 | 手机号（需符合手机号格式，且不能与其他用户重复） |
-| email | string | 否 | 邮箱（需符合邮箱格式，且不能与其他用户重复） |
-| gender | int | 否 | 性别：0=未知，1=男，2=女 |
-| birthday | string | 否 | 生日 |
-| motto | string | 否 | 签名 |
-
-**响应结果 (JSON)**：
-| 字段名 | 类型 | 说明 |
-| :--- | :--- | :--- |
-| id | int64 | 用户ID |
-| username | string | 用户名 |
-| nickname | string | 昵称 |
-| avatar | string | 头像 |
-| mobile | string | 手机号 |
-| email | string | 邮箱 |
-| gender | int | 性别 |
-| birthday | string | 生日 |
+| avatar | string | 头像地址 |
+| mobile | string | 已绑定手机号 |
+| email | string | 已绑定邮箱 |
+| gender | uint | 性别：0=未知、1=男、2=女 |
+| birthday | datetime | 生日，可为空 |
 | motto | string | 签名 |
 | money | uint | 余额 |
 | score | uint | 积分 |
 
----
+## 账号与登录
 
-### 2.5 退出登录
+### 注册
 
-* **接口路径**：`/api/user/logout`
-* **请求方式**：`POST`
-* **鉴权要求**：**必须携带有效 Token**
-* **功能描述**：注销当前的 Token，使其失效。
+- 路径：`POST /api/user/register`
+- 鉴权：免登录
+- 参数：`username`、`password` 必填；`nickname`、`mobile`、`email` 可选。
+- 结果：注册成功后自动登录，返回 `token`、`expire` 以及用户基本信息。
 
-**请求参数**：无
+`password` 长度必须为 6 至 20 位；用户名、手机号和邮箱不能重复。
 
-**响应结果 (JSON)**：
-操作成功则返回标准成功格式，无额外业务数据。
+### 登录
 
----
+- 路径：`POST /api/user/login`
+- 鉴权：免登录
+- 参数：`username`、`password`，均必填。
+- `username` 支持用户名、手机号或邮箱。
+- 结果：返回 `token`、`expire` 以及用户基本信息。
 
-## 3. 开发注意事项
+成功、密码错误和账号禁用的登录尝试都会写入用户登录历史。账号状态为 `enable` 或 `1` 时允许登录。
 
-1. **密码加密**：当前为了方便 API 调试工具测试，密码验证直接使用了 `MD5(明文密码 + 数据库Salt)`。如果前端进行了加密传输（如 HotGo 默认的 AES 加密），需要在 `api_user.go` 中改回使用 `simple.CheckPassword()` 校验。
-2. **状态验证**：登录和获取信息时均对 `user` 表的 `status` 字段进行了校验，要求其值为 `"1"` 或 `"enable"`。
-3. **白名单配置**：如果在 `api` 路由组下新增不需要鉴权的接口，必须将其路由地址添加到 [manifest/config/config.yaml](file:///p:/go/hotgo-2.0/server/manifest/config/config.yaml) 文件的 `api.exceptLogin` 列表中。
-4. **Token 鉴权机制**：由于在 `token.go` 中对 `GetAuthorization` 进行了调整，目前支持 `Authorization` 或 `userToken` 字段传递令牌。
+### 获取当前用户信息
+
+- 路径：`GET /api/user/info`
+- 鉴权：需要登录
+- 参数：无
+- 结果：返回最新的用户资料字段。
+
+### 退出登录
+
+- 路径：`POST /api/user/logout`
+- 鉴权：需要登录
+- 参数：无
+- 结果：当前访问令牌失效。
+
+## 用户资料与安全
+
+### 修改用户资料
+
+- 路径：`POST /api/user/update`
+- 鉴权：需要登录
+- 参数：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| nickname | 是 | 昵称 |
+| avatar | 是 | 头像地址 |
+| gender | 否 | 0=未知、1=男、2=女 |
+| birthday | 否 | 生日 |
+| motto | 否 | 签名 |
+
+- 结果：返回更新后的用户资料。
+
+手机号和邮箱属于敏感资料，不能通过此接口修改，必须使用对应的验证码换绑接口。
+
+### 修改登录密码
+
+- 路径：`POST /api/user/updatePwd`
+- 鉴权：需要登录
+- 参数：`oldPassword`、`newPassword`，均必填；新密码长度为 6 至 20 位，且不能与旧密码相同。
+- 结果：修改成功后当前访问令牌失效，需要重新登录。
+
+### 发送密码重置验证码
+
+- 路径：`POST /api/user/sendResetCode`
+- 鉴权：免登录
+- 参数：`mobile`，必填且须为合法手机号。
+- 结果：对于已绑定且启用的账号发送短信验证码。接口始终返回成功，避免泄露手机号是否已注册。
+
+### 通过验证码重置密码
+
+- 路径：`POST /api/user/resetPwd`
+- 鉴权：免登录
+- 参数：`mobile`、`code`、`password` 均必填；新密码长度为 6 至 20 位。
+- 结果：验证码校验成功后更新密码。
+
+### 发送手机号换绑验证码
+
+- 路径：`POST /api/user/sendMobileBindCode`
+- 鉴权：需要登录
+- 参数：`mobile`，必填，为待绑定的新手机号。
+- 结果：向新手机号发送换绑验证码。新手机号不能与当前手机号相同，也不能已被其他账号使用。
+
+### 换绑手机号
+
+- 路径：`POST /api/user/bindMobile`
+- 鉴权：需要登录
+- 参数：`password`、`mobile`、`code`，均必填。
+- 结果：校验登录密码和新手机号验证码后更新绑定手机号。
+
+### 发送邮箱换绑验证码
+
+- 路径：`POST /api/user/sendEmailBindCode`
+- 鉴权：需要登录
+- 参数：`email`，必填，为待绑定的新邮箱。
+- 结果：向新邮箱发送换绑验证码。新邮箱不能与当前邮箱相同，也不能已被其他账号使用。
+
+### 换绑邮箱
+
+- 路径：`POST /api/user/bindEmail`
+- 鉴权：需要登录
+- 参数：`password`、`email`、`code`，均必填。
+- 结果：校验登录密码和新邮箱验证码后更新绑定邮箱。
+
+### 注销账号
+
+- 路径：`POST /api/user/cancel`
+- 鉴权：需要登录
+- 参数：`password`，必填。
+- 结果：校验密码后将账号状态设为 `disable`，并使当前访问令牌失效。该操作不会物理删除账号数据。
+
+## 文件与历史记录
+
+### 上传用户文件
+
+- 路径：`POST /api/user/upload`
+- 鉴权：需要登录
+- Content-Type：`multipart/form-data`
+- 参数：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| file | 是 | 待上传的文件 |
+| uploadType | 否 | 文件类别：`image`、`doc`、`audio`、`video`、`zip` 或 `other`，默认 `other` |
+
+- 结果：返回附件记录，包括 `id`、`name`、`fileUrl`、`size`、`sizeFormat`、`mimeType`、`ext` 等。
+
+接口复用系统现有存储配置和文件类型校验，不提供匿名上传入口。
+
+### 获取资产变动流水
+
+- 路径：`GET /api/user/creditsLog`
+- 鉴权：需要登录
+- 查询参数：`page`、`perPage` 分页参数；`creditType` 可选，值为 `money` 或 `score`。
+- 结果：返回当前用户的资产流水及分页字段。
+
+每条流水包含 `creditType`、`beforeNum`、`num`、`afterNum`、`remark`、`createdAt`。后台编辑会员余额或积分时，系统会在同一数据库事务中自动创建流水记录，并在备注中保留操作后台用户 ID。
+
+### 获取登录历史
+
+- 路径：`GET /api/user/loginLog`
+- 鉴权：需要登录
+- 查询参数：`page`、`perPage` 分页参数。
+- 结果：返回当前用户的登录历史及分页字段。
+
+记录包含 `loginAt`、`loginIp`、`userAgent`、`status`、`errMsg` 和 `createdAt`。成功状态为 `1`，失败状态为 `2`。
+
+## 实现说明
+
+1. 当前项目密码算法保持既有兼容规则：`MD5(明文密码 + Salt)`。
+2. 免登录接口已在 `server/manifest/config/config.yaml` 的 `router.api.exceptLogin` 中配置。新增免登录用户接口时，应同步加入该白名单。
+3. 用户中心采用 API 契约、控制器、服务、业务逻辑和 DAO 的分层结构。控制器仅做参数透传，存储和短信、邮件能力均复用既有服务。

@@ -153,7 +153,7 @@
   import { NTag, useDialog, useMessage } from 'naive-ui';
   import { BasicTable, TableAction } from '@/components/Table';
   import { BasicForm, FormSchema, useForm } from '@/components/Form/index';
-  import { List, Delete, Edit, Selects, TableSelect } from '@/api/develop/code';
+  import { Delete, DeleteBuild, Edit, List, Selects, TableSelect } from '@/api/develop/code';
   import { useRouter } from 'vue-router';
   import { PlusOutlined, DeleteOutlined } from '@vicons/antd';
   import { newState } from '@/views/develop/code/components/model';
@@ -307,7 +307,7 @@
   };
 
   const actionColumn = reactive({
-    width: 180,
+    width: 280,
     title: '操作',
     key: 'action',
     fixed: 'right',
@@ -322,6 +322,11 @@
           {
             label: '删除',
             onClick: handleDelete.bind(null, record),
+          },
+          {
+            label: '删除生成代码',
+            onClick: handleDeleteBuild.bind(null, record),
+            ifShow: () => record.status === 1,
           },
         ],
       });
@@ -363,6 +368,21 @@
       onPositiveClick: () => {
         Delete({ id: checkedIds.value }).then((_res) => {
           message.success('操作成功');
+          reloadTable();
+        });
+      },
+    });
+  }
+
+  function handleDeleteBuild(record: Recordable) {
+    dialog.warning({
+      title: '警告',
+      content: '将删除已生成的代码、菜单 SQL 和已导入菜单，生成配置会保留。确定继续吗？',
+      positiveText: '确定',
+      negativeText: '取消',
+      onPositiveClick: () => {
+        DeleteBuild({ id: record.id }).then((_res) => {
+          message.success('已删除生成代码');
           reloadTable();
         });
       },

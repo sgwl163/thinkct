@@ -34,13 +34,10 @@ import (
 	"golang.org/x/tools/imports"
 )
 
-// parseServFunName 解析业务服务名称
+// parseServFunName 解析业务服务名称。
+// 始终保留模块分组前缀，确保同一模块内的实体命名不会产生相同 service 标识。
 func (l *gCurd) parseServFunName(templateGroup, varName string) string {
-	templateGroup = gstr.UcFirst(templateGroup)
-	if gstr.HasPrefix(varName, templateGroup) && varName != templateGroup {
-		return varName
-	}
-	return templateGroup + varName
+	return gstr.UcFirst(templateGroup) + varName
 }
 
 // hasEffectiveJoin 存在有效的关联表
@@ -171,34 +168,30 @@ func checkCurdPath(temp *model.GenerateAppCrudTemplate, addonName string) (err e
 		temp.WebViewsPath = gstr.Replace(temp.WebViewsPath, "{$name}", addonName)
 	}
 
-	tip := `生成模板配置参数'%s'路径不存在，请先创建路径:%s`
-
 	if !gfile.Exists(temp.TemplatePath) {
-		return gerror.Newf(tip, "TemplatePath", temp.TemplatePath)
+		return gerror.Newf("生成模板配置参数'TemplatePath'路径不存在:%s", temp.TemplatePath)
 	}
-	if !gfile.Exists(temp.ApiPath) {
-		return gerror.Newf(tip, "ApiPath", temp.ApiPath)
+
+	outputPaths := []struct {
+		name string
+		path string
+	}{
+		{"ApiPath", temp.ApiPath},
+		{"InputPath", temp.InputPath},
+		{"ControllerPath", temp.ControllerPath},
+		{"LogicPath", temp.LogicPath},
+		{"RouterPath", temp.RouterPath},
+		{"SqlPath", temp.SqlPath},
+		{"WebApiPath", temp.WebApiPath},
+		{"WebViewsPath", temp.WebViewsPath},
 	}
-	if !gfile.Exists(temp.InputPath) {
-		return gerror.Newf(tip, "InputPath", temp.InputPath)
-	}
-	if !gfile.Exists(temp.ControllerPath) {
-		return gerror.Newf(tip, "ControllerPath", temp.ControllerPath)
-	}
-	if !gfile.Exists(temp.LogicPath) {
-		return gerror.Newf(tip, "LogicPath", temp.LogicPath)
-	}
-	if !gfile.Exists(temp.RouterPath) {
-		return gerror.Newf(tip, "RouterPath", temp.RouterPath)
-	}
-	if !gfile.Exists(temp.SqlPath) {
-		return gerror.Newf(tip, "SqlPath", temp.SqlPath)
-	}
-	if !gfile.Exists(temp.WebApiPath) {
-		return gerror.Newf(tip, "WebApiPath", temp.WebApiPath)
-	}
-	if !gfile.Exists(temp.WebViewsPath) {
-		return gerror.Newf(tip, "WebViewsPath", temp.WebViewsPath)
+	for _, outputPath := range outputPaths {
+		if gfile.Exists(outputPath.path) {
+			continue
+		}
+		if err = gfile.Mkdir(outputPath.path); err != nil {
+			return gerror.Wrapf(err, "创建生成模板配置参数'%s'路径失败:%s", outputPath.name, outputPath.path)
+		}
 	}
 	return
 }

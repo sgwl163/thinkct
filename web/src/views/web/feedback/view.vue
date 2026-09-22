@@ -5,66 +5,44 @@
         <n-spin :show="loading" description="请稍候...">
           <n-descriptions label-placement="left" class="py-2" :column="1">
             <n-descriptions-item>
-              <template #label>
-                名称
-              </template>
+              <template #label> 名称 </template>
               {{ formValue.name }}
             </n-descriptions-item>
             <n-descriptions-item>
-              <template #label>
-                邮箱
-              </template>
+              <template #label> 邮箱 </template>
               {{ formValue.email }}
             </n-descriptions-item>
             <n-descriptions-item>
-              <template #label>
-                手机号
-              </template>
+              <template #label> 手机号 </template>
               {{ formValue.phone }}
             </n-descriptions-item>
             <n-descriptions-item>
-              <template #label>
-                公司名称
-              </template>
+              <template #label> 公司名称 </template>
               {{ formValue.company }}
             </n-descriptions-item>
             <n-descriptions-item>
-              <template #label>
-                富文本
-              </template>
-              <span v-html="formValue.content"></span>
+              <template #label> 反馈内容 </template>
+              {{ formValue.content }}
             </n-descriptions-item>
             <n-descriptions-item>
-              <template #label>
-                备注
-              </template>
-              {{ formValue.answer }}
+              <template #label> 回复内容 </template>
+              {{ formValue.answer || '暂无回复' }}
             </n-descriptions-item>
             <n-descriptions-item>
-              <template #label>
-                IP
-              </template>
+              <template #label> IP </template>
               {{ formValue.ip }}
             </n-descriptions-item>
-            <n-descriptions-item label="状态:0=禁用,1=启用">
-              <n-tag
-            :type="dict.getType('sys_normal_disable', formValue.status)"
-            size="small"
-            class="min-left-space"
-          >
-                {{ dict.getLabel('sys_normal_disable', formValue.status) }}
+            <n-descriptions-item label="处理状态">
+              <n-tag :type="getStatusType(formValue.status)" size="small" class="min-left-space">
+                {{ getStatusLabel(formValue.status) }}
               </n-tag>
             </n-descriptions-item>
             <n-descriptions-item>
-              <template #label>
-                创建时间
-              </template>
+              <template #label> 创建时间 </template>
               {{ formValue.createTime }}
             </n-descriptions-item>
             <n-descriptions-item>
-              <template #label>
-                修改时间
-              </template>
+              <template #label> 修改时间 </template>
               {{ formValue.updateTime }}
             </n-descriptions-item>
           </n-descriptions>
@@ -76,12 +54,10 @@
 <script lang="ts" setup>
   import { useMessage } from 'naive-ui';
   import { View } from '@/api/web/feedback';
-  import { State, newState } from './model';
+  import { State, newState, getStatusLabel, getStatusType } from './model';
   import { adaModalWidth } from '@/utils/hotgo';
-  import { useDictStore } from '@/store/modules/dict';
 
   const message = useMessage();
-  const dict = useDictStore();
   const loading = ref(false);
   const showModal = ref(false);
   const formValue = ref(newState(null));

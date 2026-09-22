@@ -17,6 +17,9 @@ type (
 		AdminAuth(r *ghttp.Request)
 		// ApiAuth API鉴权中间件
 		ApiAuth(r *ghttp.Request)
+		// OptionalApiAuth API可选鉴权中间件。存在有效登录令牌时写入用户上下文，
+		// 没有令牌或令牌失效时仍按游客继续请求。
+		OptionalApiAuth(r *ghttp.Request)
 		// HomeAuth 前台页面鉴权中间件
 		HomeAuth(r *ghttp.Request)
 		// Ctx 初始化请求上下文

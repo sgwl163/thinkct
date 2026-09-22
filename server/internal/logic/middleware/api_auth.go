@@ -11,6 +11,7 @@ import (
 	"github.com/gogf/gf/v2/text/gstr"
 	"hotgo/internal/consts"
 	"hotgo/internal/library/response"
+	"hotgo/internal/library/token"
 	"hotgo/utility/simple"
 )
 
@@ -36,5 +37,14 @@ func (s *sMiddleware) ApiAuth(r *ghttp.Request) {
 	// 验证路由访问权限
 	// ...
 
+	r.Middleware.Next()
+}
+
+// OptionalApiAuth API可选鉴权中间件。存在有效登录令牌时写入用户上下文，
+// 没有令牌或令牌失效时仍按游客继续请求。
+func (s *sMiddleware) OptionalApiAuth(r *ghttp.Request) {
+	if token.GetAuthorization(r) != "" {
+		_ = s.DeliverUserContext(r)
+	}
 	r.Middleware.Next()
 }

@@ -519,7 +519,9 @@ INSERT INTO `hg_admin_menu` (`id`, `pid`, `level`, `tree`, `title`, `name`, `pat
 (2419, 2418, 5, 'tr_2227 tr_2228 tr_2417 tr_2418 ', '多租户功能演示详情', 'tenantOrderView', '', '', 3, '', '/hgexample/tenantOrder/view', '', '', 1, '', 0, 0, '', 0, 1, 0, 10, '', 1, '2024-04-13 23:37:30', '2024-04-13 23:37:30'),
 (2420, 2418, 5, 'tr_2227 tr_2228 tr_2417 tr_2418 ', '编辑/新增多租户功能演示', 'tenantOrderEdit', '', '', 3, '', '/hgexample/tenantOrder/edit', '', '', 1, '', 0, 0, '', 0, 1, 0, 20, '', 1, '2024-04-13 23:37:30', '2024-04-13 23:37:30'),
 (2421, 2418, 5, 'tr_2227 tr_2228 tr_2417 tr_2418 ', '删除多租户功能演示', 'tenantOrderDelete', '', '', 3, '', '/hgexample/tenantOrder/delete', '', '', 1, '', 0, 0, '', 0, 0, 0, 40, '', 1, '2024-04-13 23:37:30', '2024-04-13 23:37:30'),
-(2422, 2418, 5, 'tr_2227 tr_2228 tr_2417 tr_2418 ', '导出多租户功能演示', 'tenantOrderExport', '', '', 3, '', '/hgexample/tenantOrder/export', '', '', 1, '', 0, 0, '', 0, 0, 0, 70, '', 1, '2024-04-13 23:37:30', '2024-04-13 23:37:30');
+(2422, 2418, 5, 'tr_2227 tr_2228 tr_2417 tr_2418 ', '导出多租户功能演示', 'tenantOrderExport', '', '', 3, '', '/hgexample/tenantOrder/export', '', '', 1, '', 0, 0, '', 0, 0, 0, 70, '', 1, '2024-04-13 23:37:30', '2024-04-13 23:37:30'),
+(2431, 2098, 3, 'tr_2097 tr_2098 ', '删除生成配置', 'genCodesDelete', '', '', 3, '', '/genCodes/delete', '', '', 1, '', 0, 2, '', 0, 0, 0, 10, '', 1, '2026-09-22 11:17:00', '2026-09-22 11:17:00'),
+(2432, 2098, 3, 'tr_2097 tr_2098 ', '删除生成代码', 'genCodesDeleteBuild', '', '', 3, '', '/genCodes/deleteBuild', '', '', 1, '', 0, 2, '', 0, 0, 0, 20, '', 1, '2026-09-22 11:17:00', '2026-09-22 11:17:00');
 
 -- --------------------------------------------------------
 
@@ -6061,7 +6063,7 @@ ALTER TABLE `hg_admin_member`
 -- AUTO_INCREMENT for table `hg_admin_menu`
 --
 ALTER TABLE `hg_admin_menu`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '菜单ID',AUTO_INCREMENT=2431;
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '菜单ID',AUTO_INCREMENT=2433;
 --
 -- AUTO_INCREMENT for table `hg_admin_notice`
 --

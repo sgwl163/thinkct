@@ -284,7 +284,12 @@ func HasStatus(headOps []string, fields []*sysin.GenCodesColumnListModel) bool {
 	if !gstr.InArray(headOps, "status") {
 		return false
 	}
-	return HasColumn(fields, "status")
+	for _, field := range fields {
+		if field.Name == "status" && IsNumberType(field.GoType) {
+			return true
+		}
+	}
+	return false
 }
 
 func HasSwitch(fields []*sysin.GenCodesColumnListModel) bool {

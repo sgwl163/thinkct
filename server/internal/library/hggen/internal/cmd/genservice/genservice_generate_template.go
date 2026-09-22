@@ -39,9 +39,7 @@ func (c CGenService) generateType(generatedContent *bytes.Buffer, srcStructFunct
 			funcContent  string
 		)
 		structName, funcSlice := key.(string), value.([]map[string]string)
-		// Generating interface content.
 		for _, funcInfo := range funcSlice {
-			// Remove package name calls of `dstPackageName` in produced codes.
 			funcHead, _ := gregex.ReplaceString(
 				fmt.Sprintf(`\*{0,1}%s\.`, dstPackageName),
 				``, funcInfo["funcHead"],
@@ -50,7 +48,6 @@ func (c CGenService) generateType(generatedContent *bytes.Buffer, srcStructFunct
 			funcContents = append(funcContents, funcContent)
 		}
 
-		// funcContents to string.
 		generatedContent.WriteString(
 			gstr.Trim(gstr.ReplaceByMap(consts.TemplateGenServiceContentInterface, g.MapStrStr{
 				"{InterfaceName}":  "I" + structName,

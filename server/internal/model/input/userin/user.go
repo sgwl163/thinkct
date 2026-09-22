@@ -85,11 +85,11 @@ func (in *UserEditInp) Filter(ctx context.Context) (err error) {
 		}
 	}
 	// 验证余额
-	if err := g.Validator().Rules("required").Data(in.Money).Messages("余额不能为空").Run(ctx); err != nil {
+	if err := g.Validator().Rules("min:0").Data(in.Money).Messages("余额不能小于0").Run(ctx); err != nil {
 		return err.Current()
 	}
 	// 验证积分
-	if err := g.Validator().Rules("required").Data(in.Score).Messages("积分不能为空").Run(ctx); err != nil {
+	if err := g.Validator().Rules("min:0").Data(in.Score).Messages("积分不能小于0").Run(ctx); err != nil {
 		return err.Current()
 	}
 	// 验证状态:enable=启用,disable=禁用

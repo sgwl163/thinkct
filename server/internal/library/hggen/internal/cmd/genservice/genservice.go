@@ -10,8 +10,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"sync"
-	"sync/atomic"
 
 	"github.com/gogf/gf/v2/container/garray"
 	"github.com/gogf/gf/v2/container/gmap"
@@ -109,6 +107,24 @@ type folderInfo struct {
 	FileInfos []*fileInfo
 }
 
+func (c CGenService) validateServiceInterface(packageName string, structFunctions *gmap.ListMap) error {
+	var validationErr error
+	structFunctions.Iterator(func(key, value any) bool {
+		structName, funcSlice := key.(string), value.([]map[string]string)
+		methodNames := make(map[string]struct{}, len(funcSlice))
+		for _, funcInfo := range funcSlice {
+			methodName := gstr.SubStr(funcInfo["funcHead"], 0, gstr.Pos(funcInfo["funcHead"], "("))
+			if _, exists := methodNames[methodName]; exists {
+				validationErr = fmt.Errorf("service generation conflict in package %q: interface I%s has duplicate method %s; ensure generated service names are unique", packageName, structName, methodName)
+				return false
+			}
+			methodNames[methodName] = struct{}{}
+		}
+		return true
+	})
+	return validationErr
+}
+
 func (c CGenService) Service(ctx context.Context, in CGenServiceInput) (out *CGenServiceOutput, err error) {
 	in.SrcFolder = filepath.ToSlash(in.SrcFolder)
 	in.SrcFolder = gstr.TrimRight(in.SrcFolder, `/`)
@@ -163,14 +179,13 @@ func (c CGenService) Service(ctx context.Context, in CGenServiceInput) (out *CGe
 	}
 
 	var (
-		isDirty                 atomic.Value                                 // Temp boolean.
+		isDirty                 bool                                         // Generated files changed.
 		files                   []string                                     // Temp file array.
 		initImportSrcPackages   []string                                     // Used for generating logic.go.
 		inputPackages           = in.Packages                                // Custom packages.
 		dstPackageName          = gstr.ToLower(gfile.Basename(in.DstFolder)) // Package name for generated go files.
 		generatedDstFilePathSet = gset.NewStrSet()                           // All generated file path set.
 	)
-	isDirty.Store(false)
 
 	// The first level folders.
 	srcFolderPaths, err := gfile.ScanDir(in.SrcFolder, "*", false)
@@ -180,7 +195,6 @@ func (c CGenService) Service(ctx context.Context, in CGenServiceInput) (out *CGe
 	// it will use goroutine to generate service files for each package.
 	var (
 		folderInfos    []folderInfo
-		wg             = sync.WaitGroup{}
 		allStructItems = make(map[string][]string)
 	)
 
@@ -257,6 +271,9 @@ func (c CGenService) Service(ctx context.Context, in CGenServiceInput) (out *CGe
 				return nil, err
 			}
 		}
+		if err = c.validateServiceInterface(srcPackageName, srcStructFunctions); err != nil {
+			return nil, err
+		}
 
 		initImportSrcPackages = append(
 			initImportSrcPackages,
@@ -271,18 +288,8 @@ func (c CGenService) Service(ctx context.Context, in CGenServiceInput) (out *CGe
 			continue
 		}
 
-		// Generating service go file for single logic package.
-		wg.Add(1)
-		go func(generateServiceFilesInput generateServiceFilesInput) {
-			defer wg.Done()
-			ok, err := c.generateServiceFile(generateServiceFilesInput)
-			if err != nil {
-				mlog.Printf(`error generating service file "%s": %v`, generateServiceFilesInput.DstFilePath, err)
-			}
-			if !isDirty.Load().(bool) && ok {
-				isDirty.Store(true)
-			}
-		}(generateServiceFilesInput{
+		// Generate service files synchronously so write failures fail the build.
+		ok, generateErr := c.generateServiceFile(generateServiceFilesInput{
 			CGenServiceInput:    in,
 			SrcPackageName:      srcPackageName,
 			SrcImportedPackages: srcImportedPackages.Slice(),
@@ -290,8 +297,11 @@ func (c CGenService) Service(ctx context.Context, in CGenServiceInput) (out *CGe
 			DstPackageName:      dstPackageName,
 			DstFilePath:         dstFilePath,
 		})
+		if generateErr != nil {
+			return nil, fmt.Errorf("generate service file %q: %w", dstFilePath, generateErr)
+		}
+		isDirty = isDirty || ok
 	}
-	wg.Wait()
 
 	if in.Clear {
 		files, err = gfile.ScanDirFile(in.DstFolder, "*.go", false)
@@ -312,7 +322,7 @@ func (c CGenService) Service(ctx context.Context, in CGenServiceInput) (out *CGe
 		}
 	}
 
-	if isDirty.Load().(bool) {
+	if isDirty {
 		// Generate initialization go file.
 		if len(initImportSrcPackages) > 0 {
 			if err = c.generateInitializationFile(in, initImportSrcPackages); err != nil {

@@ -15,6 +15,14 @@ export function Delete(params) {
   });
 }
 
+export function DeleteBuild(params) {
+  return http.request({
+    url: '/genCodes/deleteBuild',
+    method: 'POST',
+    params,
+  });
+}
+
 export function View(params) {
   return http.request({
     url: '/genCodes/view',

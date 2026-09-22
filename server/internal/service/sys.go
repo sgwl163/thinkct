@@ -226,6 +226,9 @@ type (
 	ISysGenCodes interface {
 		// Delete 删除
 		Delete(ctx context.Context, in *sysin.GenCodesDeleteInp) (err error)
+		// DeleteBuild 删除已生成代码、菜单SQL和已导入的菜单。
+		// DAO 和 service 文件由多个生成记录共享，只会在删除 logic 文件后重新生成 service 内容。
+		DeleteBuild(ctx context.Context, in *sysin.GenCodesDeleteBuildInp) (err error)
 		// Edit 修改/新增
 		Edit(ctx context.Context, in *sysin.GenCodesEditInp) (res *sysin.GenCodesEditModel, err error)
 		// Status 更新部门状态

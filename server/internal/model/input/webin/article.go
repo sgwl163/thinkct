@@ -27,6 +27,7 @@ type ArticleUpdateFields struct {
 	Diyname     string `json:"diyname"     dc:"自定义名称"`
 	TitleStyle  string `json:"titleStyle"  dc:"标题样式"`
 	Flag        string `json:"flag"        dc:"标志:top=置顶,hot=热门,recommend=推荐,new=最新"`
+	Image       string `json:"image"       dc:"图片"`
 	Images      string `json:"images"      dc:"封面图"`
 	Content     string `json:"content"     dc:"内容"`
 	Seotitle    string `json:"seotitle"    dc:"SEO标题"`
@@ -56,6 +57,7 @@ type ArticleInsertFields struct {
 	Title       string `json:"title"       dc:"标题"`
 	TitleStyle  string `json:"titleStyle"  dc:"标题样式"`
 	Flag        string `json:"flag"        dc:"标志:top=置顶,hot=热门,recommend=推荐,new=最新"`
+	Image       string `json:"image"       dc:"图片"`
 	Images      string `json:"images"      dc:"封面图片"`
 	Content     string `json:"content"     dc:"内容"`
 	Seotitle    string `json:"seotitle"    dc:"SEO标题"`
@@ -210,6 +212,7 @@ type ArticleListModel struct {
 	Title       string `json:"title"       dc:"标题"`
 	TitleStyle  string `json:"titleStyle"  dc:"标题样式"`
 	Flag        string `json:"flag"        dc:"标志:top=置顶,hot=热门,recommend=推荐,new=最新"`
+	Image       string `json:"image"       dc:"图片"`
 	Seotitle    string `json:"seotitle"    dc:"SEO标题"`
 	Keywords    string `json:"keywords"    dc:"关键词"`
 	Description string `json:"description" dc:"描述"`
@@ -238,6 +241,7 @@ type ArticleExportModel struct {
 	Title       string `json:"title"       dc:"标题"`
 	TitleStyle  string `json:"titleStyle"  dc:"标题样式"`
 	Flag        string `json:"flag"        dc:"标志:top=置顶,hot=热门,recommend=推荐,new=最新"`
+	Image       string `json:"image"       dc:"图片"`
 	Seotitle    string `json:"seotitle"    dc:"SEO标题"`
 	Keywords    string `json:"keywords"    dc:"关键词"`
 	Description string `json:"description" dc:"描述"`

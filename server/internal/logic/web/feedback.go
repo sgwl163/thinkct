@@ -51,9 +51,24 @@ func (s *sWebFeedback) List(ctx context.Context, in *webin.FeedbackListInp) (lis
 		mod = mod.Where(dao.WebFeedback.Columns().Id, in.Id)
 	}
 
-	// 查询状态:0=禁用,1=启用
-	if in.Status > 0 {
-		mod = mod.Where(dao.WebFeedback.Columns().Status, in.Status)
+	// 查询名称
+	if in.Name != "" {
+		mod = mod.WhereLike(dao.WebFeedback.Columns().Name, "%"+in.Name+"%")
+	}
+
+	// 查询手机号
+	if in.Phone != "" {
+		mod = mod.WhereLike(dao.WebFeedback.Columns().Phone, "%"+in.Phone+"%")
+	}
+
+	// 查询处理状态
+	if in.Status != nil {
+		mod = mod.Where(dao.WebFeedback.Columns().Status, *in.Status)
+	}
+
+	// 查询创建时间
+	if len(in.CreateTime) == 2 {
+		mod = mod.WhereBetween(dao.WebFeedback.Columns().CreateTime, in.CreateTime[0], in.CreateTime[1])
 	}
 
 	// 分页

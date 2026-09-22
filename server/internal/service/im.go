@@ -26,6 +26,20 @@ type (
 		GroupMemberList(ctx context.Context, req *v1.GroupMemberListReq) (res *v1.GroupMemberListRes, err error)
 		MessageList(ctx context.Context, req *v1.MessageListReq) (res *v1.MessageListRes, err error)
 	}
+	IImConversation interface {
+		// Model 会话列表管理ORM模型
+		Model(ctx context.Context, option ...*handler.Option) *gdb.Model
+		// List 获取会话列表管理列表
+		List(ctx context.Context, in *imin.ConversationListInp) (list []*imin.ConversationListModel, totalCount int, err error)
+		// Export 导出会话列表管理
+		Export(ctx context.Context, in *imin.ConversationListInp) (err error)
+		// Edit 修改/新增会话列表管理
+		Edit(ctx context.Context, in *imin.ConversationEditInp) (err error)
+		// Delete 删除会话列表管理
+		Delete(ctx context.Context, in *imin.ConversationDeleteInp) (err error)
+		// View 获取会话列表管理指定信息
+		View(ctx context.Context, in *imin.ConversationViewInp) (res *imin.ConversationViewModel, err error)
+	}
 	IImGroup interface {
 		// Model IM-群组表ORM模型
 		Model(ctx context.Context, option ...*handler.Option) *gdb.Model
@@ -61,9 +75,10 @@ type (
 )
 
 var (
-	localApiIm     IApiIm
-	localImGroup   IImGroup
-	localImMessage IImMessage
+	localApiIm          IApiIm
+	localImConversation IImConversation
+	localImGroup        IImGroup
+	localImMessage      IImMessage
 )
 
 func ApiIm() IApiIm {
@@ -75,6 +90,17 @@ func ApiIm() IApiIm {
 
 func RegisterApiIm(i IApiIm) {
 	localApiIm = i
+}
+
+func ImConversation() IImConversation {
+	if localImConversation == nil {
+		panic("implement not found for interface IImConversation, forgot register?")
+	}
+	return localImConversation
+}
+
+func RegisterImConversation(i IImConversation) {
+	localImConversation = i
 }
 
 func ImGroup() IImGroup {

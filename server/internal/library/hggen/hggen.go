@@ -260,6 +260,10 @@ func Build(ctx context.Context, in *sysin.GenCodesBuildInp) (err error) {
 	switch in.GenType {
 	case consts.GenCodesTypeCurd, consts.GenCodesTypeTree:
 		pin := &sysin.GenCodesPreviewInp{SysGenCodes: in.SysGenCodes}
+		if pin.GenTemplate < 0 || pin.GenTemplate >= len(genConfig.Application.Crud.Templates) || genConfig.Application.Crud.Templates[pin.GenTemplate] == nil {
+			return gerror.New("生成模板不存在")
+		}
+
 		return views.Curd.DoBuild(ctx, &views.CurdBuildInput{
 			PreviewIn: &views.CurdPreviewInput{
 				In:        pin,

@@ -54,6 +54,7 @@ export class State {
   public title = '';
   public titleStyle = '';
   public flag = '';
+  public image = '';
   public images = '';
   public content = '';
   public seotitle = '';

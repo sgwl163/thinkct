@@ -52,6 +52,7 @@ type ContentReq struct {
 
 type ContentRes struct {
 	Content     interface{} `json:"content" dc:"详细内容"`
+	Author      interface{} `json:"author" dc:"内容作者信息，产品内容为空"`
 	Channel     interface{} `json:"channel" dc:"所属栏目信息"`
 	Breadcrumb  interface{} `json:"breadcrumb" dc:"面包屑导航"`
 	RelatedList interface{} `json:"relatedList" dc:"相关分类(同级栏目)"`

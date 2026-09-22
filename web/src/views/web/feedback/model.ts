@@ -2,8 +2,7 @@ import { h, ref } from 'vue';
 import { NTag } from 'naive-ui';
 import { cloneDeep } from 'lodash-es';
 import { FormSchema } from '@/components/Form';
-import { defRangeShortcuts } from '@/utils/dateUtil';
-import { renderOptionTag } from '@/utils';
+import { defRangeShortcuts, timestampToTime } from '@/utils/dateUtil';
 import { useDictStore } from '@/store/modules/dict';
 
 const dict = useDictStore();
@@ -11,7 +10,7 @@ const dict = useDictStore();
 export const feedbackStatusOptions = [
   { label: '待处理', value: 0, type: 'warning' },
   { label: '已回复', value: 1, type: 'success' },
-  { label: '已关闭', value: 2, type: 'default' },
+  { label: '已关闭', value: 2, type: 'error' },
 ];
 
 export function getStatusLabel(v: number) {
@@ -31,32 +30,42 @@ export class State {
   public answer = '';
   public ip = '';
   public status = 0;
-  public createTime = '';
-  public updateTime = '';
+  public createTime = 0;
+  public updateTime = 0;
 
   constructor(state?: Partial<State>) {
-    if (state) { Object.assign(this, state); }
+    if (state) {
+      Object.assign(this, state);
+    }
   }
 }
 
 export function newState(state: State | Record<string, any> | null): State {
   if (state !== null) {
-    if (state instanceof State) { return cloneDeep(state); }
+    if (state instanceof State) {
+      return cloneDeep(state);
+    }
     return new State(state);
   }
   return new State();
 }
 
 export const rules = {
-  name: { required: true, trigger: ['blur', 'input'], type: 'string', message: '请输入名称' },
+  name: { required: true, trigger: ['blur', 'input'], type: 'string', message: '请输入姓名' },
+  content: {
+    required: true,
+    trigger: ['blur', 'input'],
+    type: 'string',
+    message: '请输入反馈内容',
+  },
 };
 
 export const schemas = ref<FormSchema[]>([
   {
     field: 'name',
     component: 'NInput',
-    label: '名称',
-    componentProps: { placeholder: '请输入名称' },
+    label: '联系人',
+    componentProps: { placeholder: '请输入联系人姓名' },
   },
   {
     field: 'phone',
@@ -67,65 +76,75 @@ export const schemas = ref<FormSchema[]>([
   {
     field: 'status',
     component: 'NSelect',
-    label: '状态',
+    label: '处理状态',
     defaultValue: null,
-    componentProps: { placeholder: '请选择状态', options: feedbackStatusOptions },
+    componentProps: { placeholder: '请选择处理状态', options: feedbackStatusOptions },
   },
   {
     field: 'createTime',
     component: 'NDatePicker',
-    label: '创建时间',
+    label: '提交时间',
     componentProps: { type: 'datetimerange', clearable: true, shortcuts: defRangeShortcuts() },
   },
 ]);
 
 export const columns = [
   {
-    title: '姓名',
+    title: '联系人',
     key: 'name',
     align: 'left',
-    width: 100,
+    width: 130,
+    ellipsis: { tooltip: true },
   },
   {
-    title: '邮箱',
-    key: 'email',
-    align: 'left',
-    width: 160,
-  },
-  {
-    title: '手机号',
+    title: '联系方式',
     key: 'phone',
     align: 'left',
-    width: 120,
+    width: 140,
+    ellipsis: { tooltip: true },
   },
   {
     title: '公司',
     key: 'company',
     align: 'left',
-    width: 140,
+    width: 160,
     ellipsis: { tooltip: true },
   },
   {
     title: '反馈内容',
     key: 'content',
     align: 'left',
-    width: 200,
+    width: 260,
     ellipsis: { tooltip: true },
   },
   {
-    title: '状态',
+    title: '回复内容',
+    key: 'answer',
+    align: 'left',
+    width: 220,
+    ellipsis: { tooltip: true },
+  },
+  {
+    title: '处理状态',
     key: 'status',
     align: 'center',
-    width: 90,
+    width: 100,
     render(row: State) {
-      return h(NTag, { type: getStatusType(row.status), size: 'small' }, { default: () => getStatusLabel(row.status) });
+      return h(
+        NTag,
+        { type: getStatusType(row.status), size: 'small' },
+        { default: () => getStatusLabel(row.status) }
+      );
     },
   },
   {
     title: '提交时间',
     key: 'createTime',
-    align: 'left',
-    width: 160,
+    align: 'center',
+    width: 170,
+    render(row: State) {
+      return row.createTime > 0 ? timestampToTime(row.createTime) : '-';
+    },
   },
 ];
 

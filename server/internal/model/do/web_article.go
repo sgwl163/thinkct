@@ -20,6 +20,7 @@ type WebArticle struct {
 	Title       any // 标题
 	TitleStyle  any // 标题样式
 	Flag        any // 标志:top=置顶,hot=热门,recommend=推荐,new=最新
+	Image       any // 图片
 	Images      any // 封面图片
 	Content     any // 内容
 	Seotitle    any // SEO标题

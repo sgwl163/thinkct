@@ -121,6 +121,11 @@ func (l *gCurd) generateWebModelStateItems(ctx context.Context, in *CurdPreviewI
 
 		isStr := isStringType(field.TsType, dataType)
 		isArray := strings.HasPrefix(dataType, "_") || strings.Contains(field.SqlType, "[]")
+		if isStr {
+			// The Vue template quotes recognized SQL text types. Normalize all
+			// TypeScript string fields so text variants such as longtext are safe.
+			dataType = "text"
+		}
 
 		var value = field.DefaultValue
 		if value == nil {
@@ -145,7 +150,7 @@ func (l *gCurd) generateWebModelStateItems(ctx context.Context, in *CurdPreviewI
 			value = "null"
 		}
 
-		if field.Name == "status" {
+		if field.Name == "status" && IsNumberType(field.GoType) {
 			value = 1
 		}
 		if field.FormMode == FormModeSwitch {

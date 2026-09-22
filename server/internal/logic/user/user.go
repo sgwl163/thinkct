@@ -9,9 +9,12 @@ package user
 import (
 	"context"
 	"fmt"
+	"hotgo/internal/consts"
 	"hotgo/internal/dao"
+	"hotgo/internal/library/contexts"
 	"hotgo/internal/library/hgorm"
 	"hotgo/internal/library/hgorm/handler"
+	"hotgo/internal/model/entity"
 	"hotgo/internal/model/input/form"
 	"hotgo/internal/model/input/userin"
 	"hotgo/internal/service"
@@ -128,16 +131,27 @@ func (s *sUserUser) Edit(ctx context.Context, in *userin.UserEditInp) (err error
 
 		// 修改
 		if in.Id > 0 {
+			var before *entity.User
+			if err = s.Model(ctx).WherePri(in.Id).Lock("FOR UPDATE").Scan(&before); err != nil {
+				return gerror.Wrap(err, "获取会员信息失败，请稍后重试！")
+			}
+			if before == nil {
+				return gerror.New("会员不存在")
+			}
+
 			in.UpdateTime = uint64(gtime.Now().Unix())
 			data := gconv.Map(in)
 			if in.Password == "" {
-				delete(data, "password")
-				delete(data, "salt")
+				delete(data, dao.User.Columns().Password)
+				delete(data, dao.User.Columns().Salt)
 			}
 			if _, err = s.Model(ctx).
 				Fields(userin.UserUpdateFields{}).
 				WherePri(in.Id).Data(data).Update(); err != nil {
-				err = gerror.Wrap(err, "修改会员管理失败，请稍后重试！")
+				return gerror.Wrap(err, "修改会员管理失败，请稍后重试！")
+			}
+			if err = s.writeCreditsLog(ctx, before, in); err != nil {
+				return err
 			}
 			return
 		}
@@ -152,6 +166,49 @@ func (s *sUserUser) Edit(ctx context.Context, in *userin.UserEditInp) (err error
 		}
 		return
 	})
+}
+
+func (s *sUserUser) writeCreditsLog(ctx context.Context, before *entity.User, in *userin.UserEditInp) error {
+	if int64(before.Money) == int64(in.Money) && int64(before.Score) == int64(in.Score) {
+		return nil
+	}
+
+	now := gtime.Now()
+	cols := dao.UserCreditsLog.Columns()
+	remark := fmt.Sprintf("后台用户:%d 编辑会员资料", contexts.GetUserId(ctx))
+	if int64(before.Money) != int64(in.Money) {
+		beforeNum, afterNum := int64(before.Money), int64(in.Money)
+		if _, err := dao.UserCreditsLog.Ctx(ctx).Data(g.Map{
+			cols.UserId:     before.Id,
+			cols.CreditType: consts.UserCreditTypeMoney,
+			cols.BeforeNum:  beforeNum,
+			cols.Num:        afterNum - beforeNum,
+			cols.AfterNum:   afterNum,
+			cols.Remark:     remark,
+			cols.Status:     consts.StatusEnabled,
+			cols.CreatedAt:  now,
+			cols.UpdatedAt:  now,
+		}).Insert(); err != nil {
+			return gerror.Wrap(err, "记录余额变动流水失败，请稍后重试！")
+		}
+	}
+	if int64(before.Score) != int64(in.Score) {
+		beforeNum, afterNum := int64(before.Score), int64(in.Score)
+		if _, err := dao.UserCreditsLog.Ctx(ctx).Data(g.Map{
+			cols.UserId:     before.Id,
+			cols.CreditType: consts.UserCreditTypeScore,
+			cols.BeforeNum:  beforeNum,
+			cols.Num:        afterNum - beforeNum,
+			cols.AfterNum:   afterNum,
+			cols.Remark:     remark,
+			cols.Status:     consts.StatusEnabled,
+			cols.CreatedAt:  now,
+			cols.UpdatedAt:  now,
+		}).Insert(); err != nil {
+			return gerror.Wrap(err, "记录积分变动流水失败，请稍后重试！")
+		}
+	}
+	return nil
 }
 
 // Delete 删除会员管理

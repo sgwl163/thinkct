@@ -154,7 +154,30 @@ type CurdBuildInput struct {
 	AfterEvent  CurdBuildEvent    // 后置事件
 }
 
+func cloneGenerateConfig(source *model.GenerateConfig) *model.GenerateConfig {
+	if source == nil {
+		return nil
+	}
+
+	config := *source
+	templates := source.Application.Crud.Templates
+	config.Application.Crud.Templates = make([]*model.GenerateAppCrudTemplate, len(templates))
+	for index, template := range templates {
+		if template == nil {
+			continue
+		}
+		copyTemplate := *template
+		config.Application.Crud.Templates[index] = &copyTemplate
+	}
+	return &config
+}
+
 func (l *gCurd) initInput(ctx context.Context, in *CurdPreviewInput) (err error) {
+	in.Config = cloneGenerateConfig(in.Config)
+
+	// Go identifiers referenced across generated packages must be exported.
+	in.In.VarName = gstr.UcFirst(in.In.VarName)
+
 	in.content = new(sysin.GenCodesPreviewModel)
 	in.content.Views = make(map[string]*sysin.GenFile)
 
@@ -187,6 +210,30 @@ func (l *gCurd) initInput(ctx context.Context, in *CurdPreviewInput) (err error)
 	return
 }
 
+func webModulePath(basePath, sourceRoot, varName string) string {
+	basePath = strings.TrimSuffix(strings.ReplaceAll(basePath, "\\", "/"), "/")
+	sourceRoot = strings.Trim(sourceRoot, "/")
+	sourcePath := "/web/src/" + sourceRoot
+
+	if index := strings.Index(basePath, sourcePath); index >= 0 {
+		basePath = strings.TrimPrefix(basePath[index+len(sourcePath):], "/")
+	} else {
+		for _, prefix := range []string{
+			"../web/src/" + sourceRoot,
+			"web/src/" + sourceRoot,
+			sourceRoot,
+		} {
+			if strings.HasPrefix(basePath, prefix) {
+				basePath = strings.TrimPrefix(basePath, prefix)
+				break
+			}
+		}
+	}
+
+	basePath = strings.Trim(basePath, "/")
+	return strings.Trim(basePath+"/"+gstr.LcFirst(varName), "/")
+}
+
 func initOptions(in *CurdPreviewInput) (err error) {
 	if err = in.In.Options.Scan(&in.options); err != nil {
 		return
@@ -196,21 +243,29 @@ func initOptions(in *CurdPreviewInput) (err error) {
 }
 
 func initTemplate(in *CurdPreviewInput) (err error) {
-	if len(in.Config.Application.Crud.Templates)-1 < in.In.GenTemplate {
+	if in.In.GenTemplate < 0 || in.In.GenTemplate >= len(in.Config.Application.Crud.Templates) {
 		return gerror.New("没有找到生成模板的配置，请检查！")
 	}
 
+	template := in.Config.Application.Crud.Templates[in.In.GenTemplate]
+	if template == nil {
+		return gerror.New("生成模板配置不能为空")
+	}
+	templateCopy := *template
+
 	// api前缀
 	apiPrefix := gstr.LcFirst(in.In.VarName)
-	if in.Config.Application.Crud.Templates[in.In.GenTemplate].IsAddon {
+	if templateCopy.IsAddon {
 		apiPrefix = in.In.AddonName + "/" + apiPrefix
 	}
 	in.options.ApiPrefix = apiPrefix
 
-	if err = checkCurdPath(in.Config.Application.Crud.Templates[in.In.GenTemplate], in.In.AddonName); err != nil {
+	if err = checkCurdPath(&templateCopy, in.In.AddonName); err != nil {
 		return
 	}
-	in.options.TemplateGroup = in.Config.Application.Crud.Templates[in.In.GenTemplate].MasterPackage
+	// Keep resolved addon paths scoped to this generation request.
+	in.Config.Application.Crud.Templates[in.In.GenTemplate] = &templateCopy
+	in.options.TemplateGroup = templateCopy.MasterPackage
 	return
 }
 
@@ -372,14 +427,11 @@ func (l *gCurd) loadView(ctx context.Context, in *CurdPreviewInput) (err error) 
 		importService = "hotgo/addons/" + in.In.AddonName + "/service"
 	}
 
-	in.options.ImportWebApi = "@/api/" + gstr.LcFirst(in.In.VarName)
+	in.options.ImportWebApi = "@/api/" + webModulePath(temp.WebApiPath, "api", in.In.VarName)
+	componentPrefix := webModulePath(temp.WebViewsPath, "views", in.In.VarName)
 	if temp.IsAddon {
 		in.options.ImportWebApi = "@/api/addons/" + in.In.AddonName + "/" + gstr.LcFirst(in.In.VarName)
-	}
-
-	componentPrefix := gstr.LcFirst(in.In.VarName)
-	if temp.IsAddon {
-		componentPrefix = "addons/" + in.In.AddonName + "/" + componentPrefix
+		componentPrefix = "addons/" + in.In.AddonName + "/" + gstr.LcFirst(in.In.VarName)
 	}
 
 	nowTime := now.Format("Y-m-d H:i:s")
@@ -451,9 +503,10 @@ func (l *gCurd) DoBuild(ctx context.Context, in *CurdBuildInput) (err error) {
 			return gerror.Newf("writing content to '%s' failed: %v", vi.Path, err)
 		}
 
-		// 导入失败，将sql文件删除
+		// SQL 导入失败时停止构建，避免状态被标记为成功。
 		if err = ImportSql(ctx, vi.Path); err != nil {
-			_ = gfile.RemoveAll(vi.Path)
+			_ = gfile.RemoveFile(vi.Path)
+			return gerror.Wrapf(err, "导入生成菜单 SQL 失败:%s", vi.Path)
 		}
 		return
 	}
@@ -896,7 +949,7 @@ func (l *gCurd) generateSqlContent(ctx context.Context, in *CurdPreviewInput) (e
 			"menuTable":     config.Prefix + "admin_menu",
 			"mainComponent": "LAYOUT",
 		}
-		genFile     = new(sysin.GenFile)
+		genFile      = new(sysin.GenFile)
 		templateName = "source.sql.template"
 	)
 

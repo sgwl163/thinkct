@@ -50,28 +50,13 @@
                 </n-form-item>
               </n-gi>
               <n-gi span="1">
-                <n-form-item label="模型" path="model">
-                  <n-input placeholder="请输入模型" v-model:value="formValue.model" />
+                <n-form-item label="模型" path="model" required>
+                  <n-select v-model:value="formValue.model" :options="modelOptions" placeholder="请选择模型" />
                 </n-form-item>
               </n-gi>
-              <n-gi span="2">
-                <n-form-item label="模板地址" path="template">
+              <n-gi span="1">
+                <n-form-item label="模板地址" path="template" required>
                   <n-input placeholder="请输入模板地址" v-model:value="formValue.template" />
-                </n-form-item>
-              </n-gi>
-              <n-gi span="2">
-                <n-form-item label="跳转链接" path="url">
-                  <n-input placeholder="请输入跳转链接（类型为跳转链接时填写）" v-model:value="formValue.url" />
-                </n-form-item>
-              </n-gi>
-              <n-gi span="1">
-                <n-form-item label="跳转方式" path="target">
-                  <n-select v-model:value="formValue.target" :options="targetOptions" placeholder="请选择跳转方式" />
-                </n-form-item>
-              </n-gi>
-              <n-gi span="1">
-                <n-form-item label="访问策略" path="allowVisitGroups">
-                  <n-select v-model:value="formValue.allowVisitGroups" :options="visitGroupOptions" placeholder="请选择访问策略" />
                 </n-form-item>
               </n-gi>
               <n-gi span="2">
@@ -87,6 +72,21 @@
               <n-gi span="2">
                 <n-form-item label="描述" path="description">
                   <n-input type="textarea" placeholder="请输入描述" v-model:value="formValue.description" :rows="3" />
+                </n-form-item>
+              </n-gi>
+              <n-gi span="1">
+                <n-form-item label="跳转链接" path="url">
+                  <n-input placeholder="请输入跳转链接（类型为跳转链接时填写）" v-model:value="formValue.url" />
+                </n-form-item>
+              </n-gi>
+              <n-gi span="1">
+                <n-form-item label="跳转方式" path="target">
+                  <n-select v-model:value="formValue.target" :options="targetOptions" placeholder="请选择跳转方式" />
+                </n-form-item>
+              </n-gi>
+              <n-gi span="1">
+                <n-form-item label="访问策略" path="allowVisitGroups">
+                  <n-select v-model:value="formValue.allowVisitGroups" :options="visitGroupOptions" placeholder="请选择访问策略" />
                 </n-form-item>
               </n-gi>
               <n-gi span="1">
@@ -116,7 +116,7 @@
 <script lang="ts" setup>
   import { useDictStore } from '@/store/modules/dict';
   import { Edit, View } from '@/api/web/channel';
-  import { State, newState, treeOption, loadTreeOption, rules, channelTypeOptions, targetOptions, visitGroupOptions } from './model';
+  import { State, newState, treeOption, loadTreeOption, rules, channelTypeOptions, modelOptions, targetOptions, visitGroupOptions } from './model';
   import { useProjectSettingStore } from '@/store/modules/projectSetting';
   import { useMessage } from 'naive-ui';
   import { adaModalWidth } from '@/utils/hotgo';

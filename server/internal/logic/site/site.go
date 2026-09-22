@@ -2,6 +2,7 @@ package site
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -28,15 +29,50 @@ func init() {
 	service.RegisterApiSite(NewApiSite())
 }
 
-// optimizeImage 提取图片显示优化逻辑
-func optimizeImage(image, images string) string {
-	if image == "" && images != "" {
-		imagesArr := strings.Split(images, ",")
-		if len(imagesArr) > 0 {
-			return imagesArr[0]
+// normalizeImages converts legacy comma-separated values and JSON arrays into image URLs.
+func normalizeImages(images string) []string {
+	images = strings.TrimSpace(images)
+	if images == "" {
+		return []string{}
+	}
+
+	var imageList []string
+	if strings.HasPrefix(images, "[") && json.Unmarshal([]byte(images), &imageList) == nil {
+		result := make([]string, 0, len(imageList))
+		for _, image := range imageList {
+			if image = strings.TrimSpace(image); image != "" {
+				result = append(result, image)
+			}
+		}
+		return result
+	}
+
+	imageList = strings.Split(images, ",")
+	result := make([]string, 0, len(imageList))
+	for _, image := range imageList {
+		if image = strings.TrimSpace(image); image != "" {
+			result = append(result, image)
 		}
 	}
-	return image
+	return result
+}
+
+// optimizeImage returns the configured cover image or the first image in the gallery.
+func optimizeImage(image, images string) string {
+	if imageList := normalizeImages(image); len(imageList) > 0 {
+		return imageList[0]
+	}
+	if imageList := normalizeImages(images); len(imageList) > 0 {
+		return imageList[0]
+	}
+	return ""
+}
+
+// normalizeImageFields standardizes image fields for the site API response.
+func normalizeImageFields(image *string, images *string) {
+	imageList := normalizeImages(*images)
+	*images = strings.Join(imageList, ",")
+	*image = optimizeImage(*image, *images)
 }
 
 // formatChannelUrl 格式化栏目URL
@@ -70,6 +106,245 @@ func getChannelChildrenIds(ctx context.Context, id uint) []uint {
 		ids = append(ids, getChannelChildrenIds(ctx, child.Id)...)
 	}
 	return ids
+}
+
+// resolveChannelIds resolves channel IDs or diyname values, falling back to defaults.
+func resolveChannelIds(ctx context.Context, value string, defaults []int) []int {
+	if value == "" {
+		return defaults
+	}
+
+	idStrings := gstr.SplitAndTrim(value, ",")
+	if len(idStrings) == 0 {
+		return defaults
+	}
+
+	ids := make([]int, 0, len(idStrings))
+	for _, idStr := range idStrings {
+		if gstr.IsNumeric(idStr) {
+			ids = append(ids, gconv.Int(idStr))
+			continue
+		}
+
+		var channelId int
+		_ = dao.WebChannel.Ctx(ctx).Where("diyname", idStr).Where("status", 1).Fields("id").Scan(&channelId)
+		if channelId > 0 {
+			ids = append(ids, channelId)
+		}
+	}
+	return ids
+}
+
+// getChannelIdsAndMap returns a channel and all enabled descendants for content queries.
+func getChannelIdsAndMap(ctx context.Context, channel *entity.WebChannel) ([]uint, map[uint]*entity.WebChannel) {
+	channelIds := append(getChannelChildrenIds(ctx, channel.Id), channel.Id)
+	channelMap := map[uint]*entity.WebChannel{channel.Id: channel}
+	if len(channelIds) == 1 {
+		return channelIds, channelMap
+	}
+
+	var subChannels []*entity.WebChannel
+	_ = dao.WebChannel.Ctx(ctx).WhereIn("id", channelIds).Where("status", 1).Scan(&subChannels)
+	for _, subChannel := range subChannels {
+		formatChannelUrl(subChannel)
+		channelMap[subChannel.Id] = subChannel
+	}
+	return channelIds, channelMap
+}
+
+// filterContentByChannelIds matches content assigned to a primary or secondary channel.
+func filterContentByChannelIds(m *gdb.Model, channelIdColumn, channelIdsColumn string, channelIds []uint) *gdb.Model {
+	if len(channelIds) == 0 {
+		return m.Where("1 = 0")
+	}
+
+	conditions := make([]string, 0, len(channelIds)*2)
+	args := make([]interface{}, 0, len(channelIds)*2)
+	for _, channelId := range channelIds {
+		conditions = append(conditions,
+			fmt.Sprintf("%s = ?", channelIdColumn),
+			fmt.Sprintf("FIND_IN_SET(?, %s) > 0", channelIdsColumn),
+		)
+		args = append(args, channelId, channelId)
+	}
+	return m.Where("("+strings.Join(conditions, " OR ")+")", args...)
+}
+
+func getContentChannelMap(ctx context.Context, contentChannelIds []uint) map[uint]*entity.WebChannel {
+	channelMap := make(map[uint]*entity.WebChannel, len(contentChannelIds))
+	if len(contentChannelIds) == 0 {
+		return channelMap
+	}
+
+	var channels []*entity.WebChannel
+	_ = dao.WebChannel.Ctx(ctx).WhereIn("id", contentChannelIds).Where("status", 1).Scan(&channels)
+	for _, channel := range channels {
+		formatChannelUrl(channel)
+		channelMap[channel.Id] = channel
+	}
+	return channelMap
+}
+
+func getBreadcrumb(ctx context.Context, channel *entity.WebChannel) []*entity.WebChannel {
+	breadcrumb := make([]*entity.WebChannel, 0)
+	for current := channel; current != nil; {
+		breadcrumb = append([]*entity.WebChannel{current}, breadcrumb...)
+		if current.Pid == 0 {
+			break
+		}
+
+		var parent *entity.WebChannel
+		_ = dao.WebChannel.Ctx(ctx).Where("id", current.Pid).Where("status", 1).Scan(&parent)
+		if parent != nil {
+			formatChannelUrl(parent)
+		}
+		current = parent
+	}
+	return breadcrumb
+}
+
+func getRelatedChannels(ctx context.Context, pid uint) []*entity.WebChannel {
+	var relatedList []*entity.WebChannel
+	_ = dao.WebChannel.Ctx(ctx).Where("pid", pid).Where("status", 1).Order("weigh desc, id asc").Scan(&relatedList)
+	if relatedList == nil {
+		return make([]*entity.WebChannel, 0)
+	}
+	for _, channel := range relatedList {
+		formatChannelUrl(channel)
+	}
+	return relatedList
+}
+
+func formatArticle(article *entity.WebArticle, channelMap map[uint]*entity.WebChannel, fallbackChannel *entity.WebChannel) {
+	if article == nil {
+		return
+	}
+	normalizeImageFields(&article.Image, &article.Images)
+	channel := channelMap[article.ChannelId]
+	if channel == nil {
+		channel = fallbackChannel
+	}
+	formatArticleUrl(article, channel)
+}
+
+func formatArticles(articles []*entity.WebArticle, channelMap map[uint]*entity.WebChannel, fallbackChannel *entity.WebChannel) {
+	for _, article := range articles {
+		formatArticle(article, channelMap, fallbackChannel)
+	}
+}
+
+type articleAuthorStats struct {
+	ArticleCount int `json:"articleCount"`
+	ViewCount    int `json:"viewCount"`
+}
+
+func (s *sApiSite) loadArticleAuthor(ctx context.Context, article *entity.WebArticle) (*sitein.ContentAuthor, error) {
+	if article == nil {
+		return nil, nil
+	}
+
+	if article.UserId > 0 {
+		var user *entity.User
+		cols := dao.User.Columns()
+		if err := dao.User.Ctx(ctx).Fields(cols.Id, cols.Username, cols.Nickname, cols.Avatar, cols.Motto).WherePri(article.UserId).Scan(&user); err != nil {
+			return nil, gerror.Wrap(err, "获取文章作者信息失败，请稍后重试")
+		}
+		if user != nil {
+			stats, err := s.loadArticleAuthorStats(ctx, dao.WebArticle.Columns().UserId, article.UserId)
+			if err != nil {
+				return nil, err
+			}
+			return &sitein.ContentAuthor{
+				Id:           user.Id,
+				Username:     user.Username,
+				Nickname:     user.Nickname,
+				Avatar:       user.Avatar,
+				Motto:        user.Motto,
+				ArticleCount: stats.ArticleCount,
+				ViewCount:    stats.ViewCount,
+			}, nil
+		}
+	}
+
+	if article.AdminId == 0 {
+		return nil, nil
+	}
+	var admin *entity.AdminMember
+	cols := dao.AdminMember.Columns()
+	if err := dao.AdminMember.Ctx(ctx).Fields(cols.Id, cols.Username, cols.RealName, cols.Avatar).WherePri(article.AdminId).Scan(&admin); err != nil {
+		return nil, gerror.Wrap(err, "获取文章作者信息失败，请稍后重试")
+	}
+	if admin == nil {
+		return nil, nil
+	}
+	stats, err := s.loadArticleAuthorStats(ctx, dao.WebArticle.Columns().AdminId, article.AdminId)
+	if err != nil {
+		return nil, err
+	}
+	return &sitein.ContentAuthor{
+		Id:           uint(admin.Id),
+		Username:     admin.Username,
+		Nickname:     admin.RealName,
+		Avatar:       admin.Avatar,
+		IsAdmin:      true,
+		ArticleCount: stats.ArticleCount,
+		ViewCount:    stats.ViewCount,
+	}, nil
+}
+
+func (s *sApiSite) loadArticleAuthorStats(ctx context.Context, authorColumn string, authorID interface{}) (stats articleAuthorStats, err error) {
+	cols := dao.WebArticle.Columns()
+	err = dao.WebArticle.Ctx(ctx).
+		Fields(fmt.Sprintf("COUNT(*) AS article_count, COALESCE(SUM(%s), 0) AS view_count", cols.Views)).
+		Where(authorColumn, authorID).
+		Where(cols.Status, 1).
+		Scan(&stats)
+	if err != nil {
+		return stats, gerror.Wrap(err, "获取作者文章统计失败，请稍后重试")
+	}
+	return stats, nil
+}
+
+func formatProduct(product *entity.WebProducts, channelMap map[uint]*entity.WebChannel, fallbackChannel *entity.WebChannel) {
+	if product == nil {
+		return
+	}
+	normalizeImageFields(&product.Image, &product.Images)
+	channel := channelMap[product.ChannelId]
+	if channel == nil {
+		channel = fallbackChannel
+	}
+	formatProductUrl(product, channel)
+}
+
+func formatProducts(products []*entity.WebProducts, channelMap map[uint]*entity.WebChannel, fallbackChannel *entity.WebChannel) {
+	for _, product := range products {
+		formatProduct(product, channelMap, fallbackChannel)
+	}
+}
+
+func getProductChannelIds(products []*entity.WebProducts) []uint {
+	channelIds := make([]uint, 0)
+	channelIdSet := make(map[uint]struct{})
+	for _, product := range products {
+		if _, exists := channelIdSet[product.ChannelId]; !exists {
+			channelIds = append(channelIds, product.ChannelId)
+			channelIdSet[product.ChannelId] = struct{}{}
+		}
+	}
+	return channelIds
+}
+
+func getArticleChannelIds(articles []*entity.WebArticle) []uint {
+	channelIds := make([]uint, 0)
+	channelIdSet := make(map[uint]struct{})
+	for _, article := range articles {
+		if _, exists := channelIdSet[article.ChannelId]; !exists {
+			channelIds = append(channelIds, article.ChannelId)
+			channelIdSet[article.ChannelId] = struct{}{}
+		}
+	}
+	return channelIds
 }
 
 // Index 获取首页数据
@@ -111,70 +386,19 @@ func (s *sApiSite) Home(ctx context.Context, in sitein.HomeInp) (res *sitein.Hom
 	res = new(sitein.HomeModel)
 
 	// 处理参数
-	productsChannelIdsArr := []int{7, 8, 9, 10, 11} // 默认产品分类
-	if in.ProductsChannelIds != "" {
-		idStrings := gstr.SplitAndTrim(in.ProductsChannelIds, ",")
-		if len(idStrings) > 0 {
-			productsChannelIdsArr = make([]int, 0)
-			for _, idStr := range idStrings {
-				if gstr.IsNumeric(idStr) {
-					productsChannelIdsArr = append(productsChannelIdsArr, gconv.Int(idStr))
-				} else {
-					var chId int
-					_ = dao.WebChannel.Ctx(ctx).Where("diyname", idStr).Where("status", 1).Fields("id").Scan(&chId)
-					if chId > 0 {
-						productsChannelIdsArr = append(productsChannelIdsArr, chId)
-					}
-				}
-			}
-		}
-	}
-	productsLimit := 4 // 默认显示4条
+	productsChannelIdsArr := resolveChannelIds(ctx, in.ProductsChannelIds, []int{7, 8, 9, 10, 11}) // 默认产品分类
+	productsLimit := 4                                                                             // 默认显示4条
 	if in.ProductsLimit > 0 {
 		productsLimit = in.ProductsLimit
 	}
 
-	casesChannelIdsArr := []int{16} // 默认应用案例/经典案例栏目ID为16 (diyname: cases)
-	if in.CasesChannelIds != "" {
-		idStrings := gstr.SplitAndTrim(in.CasesChannelIds, ",")
-		if len(idStrings) > 0 {
-			casesChannelIdsArr = make([]int, 0)
-			for _, idStr := range idStrings {
-				if gstr.IsNumeric(idStr) {
-					casesChannelIdsArr = append(casesChannelIdsArr, gconv.Int(idStr))
-				} else {
-					var chId int
-					_ = dao.WebChannel.Ctx(ctx).Where("diyname", idStr).Where("status", 1).Fields("id").Scan(&chId)
-					if chId > 0 {
-						casesChannelIdsArr = append(casesChannelIdsArr, chId)
-					}
-				}
-			}
-		}
-	}
+	casesChannelIdsArr := resolveChannelIds(ctx, in.CasesChannelIds, []int{16}) // 默认应用案例/经典案例栏目ID为16 (diyname: cases)
 	casesLimit := 3
 	if in.CasesLimit > 0 {
 		casesLimit = in.CasesLimit
 	}
 
-	newsChannelIdsArr := []int{2} // 默认新闻中心根栏目ID为2
-	if in.NewsChannelIds != "" {
-		idStrings := gstr.SplitAndTrim(in.NewsChannelIds, ",")
-		if len(idStrings) > 0 {
-			newsChannelIdsArr = make([]int, 0)
-			for _, idStr := range idStrings {
-				if gstr.IsNumeric(idStr) {
-					newsChannelIdsArr = append(newsChannelIdsArr, gconv.Int(idStr))
-				} else {
-					var chId int
-					_ = dao.WebChannel.Ctx(ctx).Where("diyname", idStr).Where("status", 1).Fields("id").Scan(&chId)
-					if chId > 0 {
-						newsChannelIdsArr = append(newsChannelIdsArr, chId)
-					}
-				}
-			}
-		}
-	}
+	newsChannelIdsArr := resolveChannelIds(ctx, in.NewsChannelIds, []int{2}) // 默认新闻中心根栏目ID为2
 	newsLimit := 3
 	if in.NewsLimit > 0 {
 		newsLimit = in.NewsLimit
@@ -191,33 +415,13 @@ func (s *sApiSite) Home(ctx context.Context, in sitein.HomeInp) (res *sitein.Hom
 				WebChannel: ch,
 				List:       make([]*entity.WebProducts, 0),
 			}
-			// 获取频道及所有子频道ID
-			channelIds := append(getChannelChildrenIds(ctx, ch.Id), ch.Id)
-
-			// 建立 channelId -> channel 映射
-			channelMap := make(map[uint]*entity.WebChannel)
-			channelMap[ch.Id] = ch
-			if len(channelIds) > 1 {
-				var subChannels []*entity.WebChannel
-				_ = dao.WebChannel.Ctx(ctx).WhereIn("id", channelIds).Where("status", 1).Scan(&subChannels)
-				for _, subCh := range subChannels {
-					formatChannelUrl(subCh)
-					channelMap[subCh.Id] = subCh
-				}
-			}
+			channelIds, channelMap := getChannelIdsAndMap(ctx, ch)
 
 			// 查询该栏目及子栏目下的产品内容
 			var chProducts []*entity.WebProducts
 			err = dao.WebProducts.Ctx(ctx).Where("status", "normal").WhereIn("channel_id", channelIds).Order("weigh desc, id desc").Limit(productsLimit).Scan(&chProducts)
 			if err == nil && chProducts != nil {
-				for _, p := range chProducts {
-					p.Image = optimizeImage(p.Image, p.Images)
-					itemChannel := channelMap[p.ChannelId]
-					if itemChannel == nil {
-						itemChannel = ch
-					}
-					formatProductUrl(p, itemChannel)
-				}
+				formatProducts(chProducts, channelMap, ch)
 				model.List = chProducts
 			}
 			res.ProductsChannels = append(res.ProductsChannels, model)
@@ -237,32 +441,13 @@ func (s *sApiSite) Home(ctx context.Context, in sitein.HomeInp) (res *sitein.Hom
 				WebChannel: ch,
 				List:       make([]*entity.WebArticle, 0),
 			}
-			// 获取频道及所有子频道ID
-			channelIds := append(getChannelChildrenIds(ctx, ch.Id), ch.Id)
-
-			channelMap := make(map[uint]*entity.WebChannel)
-			channelMap[ch.Id] = ch
-			if len(channelIds) > 1 {
-				var subChannels []*entity.WebChannel
-				_ = dao.WebChannel.Ctx(ctx).WhereIn("id", channelIds).Where("status", 1).Scan(&subChannels)
-				for _, subCh := range subChannels {
-					formatChannelUrl(subCh)
-					channelMap[subCh.Id] = subCh
-				}
-			}
+			channelIds, channelMap := getChannelIdsAndMap(ctx, ch)
 
 			var chCases []*entity.WebArticle
 			// 经典案例一般带有图片 (数据库字段为 images)
 			err = dao.WebArticle.Ctx(ctx).Where("status", "normal").WhereIn("channel_id", channelIds).WhereNot("images", "").Order("weigh desc, id desc").Limit(casesLimit).Scan(&chCases)
 			if err == nil && chCases != nil {
-				for _, item := range chCases {
-					item.Image = optimizeImage(item.Image, item.Images)
-					itemChannel := channelMap[item.ChannelId]
-					if itemChannel == nil {
-						itemChannel = ch
-					}
-					formatArticleUrl(item, itemChannel)
-				}
+				formatArticles(chCases, channelMap, ch)
 				model.List = chCases
 			}
 			res.CasesChannels = append(res.CasesChannels, model)
@@ -282,31 +467,12 @@ func (s *sApiSite) Home(ctx context.Context, in sitein.HomeInp) (res *sitein.Hom
 				WebChannel: ch,
 				List:       make([]*entity.WebArticle, 0),
 			}
-			// 获取频道及所有子频道ID
-			channelIds := append(getChannelChildrenIds(ctx, ch.Id), ch.Id)
-
-			channelMap := make(map[uint]*entity.WebChannel)
-			channelMap[ch.Id] = ch
-			if len(channelIds) > 1 {
-				var subChannels []*entity.WebChannel
-				_ = dao.WebChannel.Ctx(ctx).WhereIn("id", channelIds).Where("status", 1).Scan(&subChannels)
-				for _, subCh := range subChannels {
-					formatChannelUrl(subCh)
-					channelMap[subCh.Id] = subCh
-				}
-			}
+			channelIds, channelMap := getChannelIdsAndMap(ctx, ch)
 
 			var chNews []*entity.WebArticle
 			err = dao.WebArticle.Ctx(ctx).Where("status", "normal").WhereIn("channel_id", channelIds).Order("publish_time desc, id desc").Limit(newsLimit).Scan(&chNews)
 			if err == nil && chNews != nil {
-				for _, item := range chNews {
-					item.Image = optimizeImage(item.Image, item.Images)
-					itemChannel := channelMap[item.ChannelId]
-					if itemChannel == nil {
-						itemChannel = ch
-					}
-					formatArticleUrl(item, itemChannel)
-				}
+				formatArticles(chNews, channelMap, ch)
 				model.List = chNews
 			}
 			res.NewsChannels = append(res.NewsChannels, model)
@@ -370,33 +536,8 @@ func (s *sApiSite) Channel(ctx context.Context, in sitein.ChannelInp) (res *site
 		if res.Channel != nil {
 			formatChannelUrl(res.Channel)
 
-			// 获取面包屑导航 (从根栏目到当前栏目)
-			breadcrumb := make([]*entity.WebChannel, 0)
-			curr := res.Channel
-			for curr != nil {
-				breadcrumb = append([]*entity.WebChannel{curr}, breadcrumb...)
-				if curr.Pid > 0 {
-					var parent *entity.WebChannel
-					_ = dao.WebChannel.Ctx(ctx).Where("id", curr.Pid).Where("status", 1).Scan(&parent)
-					if parent != nil {
-						formatChannelUrl(parent)
-					}
-					curr = parent
-				} else {
-					break
-				}
-			}
-			res.Breadcrumb = breadcrumb
-
-			// 获取同级相关分类
-			dao.WebChannel.Ctx(ctx).Where("pid", res.Channel.Pid).Where("status", 1).Order("weigh desc, id asc").Scan(&res.RelatedList)
-			if res.RelatedList == nil {
-				res.RelatedList = make([]*entity.WebChannel, 0)
-			} else {
-				for _, relCh := range res.RelatedList {
-					formatChannelUrl(relCh)
-				}
-			}
+			res.Breadcrumb = getBreadcrumb(ctx, res.Channel)
+			res.RelatedList = getRelatedChannels(ctx, res.Channel.Pid)
 			if in.Page <= 0 {
 				in.Page = 1
 			}
@@ -405,90 +546,69 @@ func (s *sApiSite) Channel(ctx context.Context, in sitein.ChannelInp) (res *site
 			}
 			res.Page = in.Page
 
-			// 获取频道及所有子频道ID
-			channelIds := append(getChannelChildrenIds(ctx, res.Channel.Id), res.Channel.Id)
-
-			// 建立 channelId -> channel 映射，方便生成子频道内容的准确 URL
-			channelMap := make(map[uint]*entity.WebChannel)
-			channelMap[res.Channel.Id] = res.Channel
-			if len(channelIds) > 1 {
-				var subChannels []*entity.WebChannel
-				_ = dao.WebChannel.Ctx(ctx).WhereIn("id", channelIds).Where("status", 1).Scan(&subChannels)
-				for _, ch := range subChannels {
-					formatChannelUrl(ch)
-					channelMap[ch.Id] = ch
-				}
-			}
+			channelIds, channelMap := getChannelIdsAndMap(ctx, res.Channel)
 
 			if res.Channel.Model == "article" {
-				m := dao.WebArticle.Ctx(ctx).Where("status", 1).WhereIn("channel_id", channelIds)
+				m := filterContentByChannelIds(
+					dao.WebArticle.Ctx(ctx).Where("status", 1),
+					dao.WebArticle.Columns().ChannelId,
+					dao.WebArticle.Columns().ChannelIds,
+					channelIds,
+				)
 				var list []*entity.WebArticle
 				var lst interface{} = &list
 				res.Total, err = s.handleList(ctx, m, in, lst)
 				if list == nil {
 					list = make([]*entity.WebArticle, 0)
 				}
-				for _, article := range list {
-					article.Image = optimizeImage(article.Image, article.Images)
-					itemChannel := channelMap[article.ChannelId]
-					if itemChannel == nil {
-						itemChannel = res.Channel
-					}
-					formatArticleUrl(article, itemChannel)
-				}
+				formatArticles(list, channelMap, res.Channel)
 				res.List = list
 
 				// 获取热门文章 (根据 views 排序)
-				mHot := dao.WebArticle.Ctx(ctx).Where("status", 1).WhereIn("channel_id", channelIds)
+				mHot := filterContentByChannelIds(
+					dao.WebArticle.Ctx(ctx).Where("status", 1),
+					dao.WebArticle.Columns().ChannelId,
+					dao.WebArticle.Columns().ChannelIds,
+					channelIds,
+				)
 				var hotList []*entity.WebArticle
 				var hotLst interface{} = &hotList
 				err = s.handleHotList(ctx, mHot, hotLst)
 				if hotList == nil {
 					hotList = make([]*entity.WebArticle, 0)
 				}
-				for _, article := range hotList {
-					article.Image = optimizeImage(article.Image, article.Images)
-					itemChannel := channelMap[article.ChannelId]
-					if itemChannel == nil {
-						itemChannel = res.Channel
-					}
-					formatArticleUrl(article, itemChannel)
-				}
+				formatArticles(hotList, channelMap, res.Channel)
 				res.HotList = hotList
 			} else if res.Channel.Model == "products" {
-				m := dao.WebProducts.Ctx(ctx).Where("status", 1).WhereIn("channel_id", channelIds)
+				m := filterContentByChannelIds(
+					dao.WebProducts.Ctx(ctx).Where("status", 1),
+					dao.WebProducts.Columns().ChannelId,
+					dao.WebProducts.Columns().ChannelIds,
+					channelIds,
+				)
 				var list []*entity.WebProducts
 				var lst interface{} = &list
 				res.Total, err = s.handleList(ctx, m, in, lst)
 				if list == nil {
 					list = make([]*entity.WebProducts, 0)
 				}
-				for _, product := range list {
-					product.Image = optimizeImage(product.Image, product.Images)
-					itemChannel := channelMap[product.ChannelId]
-					if itemChannel == nil {
-						itemChannel = res.Channel
-					}
-					formatProductUrl(product, itemChannel)
-				}
+				formatProducts(list, channelMap, res.Channel)
 				res.List = list
 
 				// 获取热门产品 (根据 views 排序)
-				mHot := dao.WebProducts.Ctx(ctx).Where("status", 1).WhereIn("channel_id", channelIds)
+				mHot := filterContentByChannelIds(
+					dao.WebProducts.Ctx(ctx).Where("status", 1),
+					dao.WebProducts.Columns().ChannelId,
+					dao.WebProducts.Columns().ChannelIds,
+					channelIds,
+				)
 				var hotList []*entity.WebProducts
 				var hotLst interface{} = &hotList
 				err = s.handleHotList(ctx, mHot, hotLst)
 				if hotList == nil {
 					hotList = make([]*entity.WebProducts, 0)
 				}
-				for _, product := range hotList {
-					product.Image = optimizeImage(product.Image, product.Images)
-					itemChannel := channelMap[product.ChannelId]
-					if itemChannel == nil {
-						itemChannel = res.Channel
-					}
-					formatProductUrl(product, itemChannel)
-				}
+				formatProducts(hotList, channelMap, res.Channel)
 				res.HotList = hotList
 			}
 		}
@@ -535,23 +655,7 @@ func (s *sApiSite) Content(ctx context.Context, in sitein.ContentInp) (res *site
 	}
 	formatChannelUrl(res.Channel)
 
-	// 获取面包屑导航 (从根栏目到当前栏目)
-	breadcrumb := make([]*entity.WebChannel, 0)
-	curr := res.Channel
-	for curr != nil {
-		breadcrumb = append([]*entity.WebChannel{curr}, breadcrumb...)
-		if curr.Pid > 0 {
-			var parent *entity.WebChannel
-			_ = dao.WebChannel.Ctx(ctx).Where("id", curr.Pid).Where("status", 1).Scan(&parent)
-			if parent != nil {
-				formatChannelUrl(parent)
-			}
-			curr = parent
-		} else {
-			break
-		}
-	}
-	res.Breadcrumb = breadcrumb
+	res.Breadcrumb = getBreadcrumb(ctx, res.Channel)
 
 	if res.Channel.Model == "article" {
 		var article *entity.WebArticle
@@ -560,22 +664,23 @@ func (s *sApiSite) Content(ctx context.Context, in sitein.ContentInp) (res *site
 			return nil, err
 		}
 		if article != nil {
-			// 优化 Image 字段：如果 article.Image 为空，但 Images 不为空，则取 Images 的第一张图
-			article.Image = optimizeImage(article.Image, article.Images)
-			formatArticleUrl(article, res.Channel)
+			formatArticle(article, nil, res.Channel)
+			author, err := s.loadArticleAuthor(ctx, article)
+			if err != nil {
+				return nil, err
+			}
 			res.Content = article
+			res.Author = author
 
 			var prevItem *entity.WebArticle
 			var nextItem *entity.WebArticle
 			s.handlePrevNext(ctx, dao.WebArticle.Ctx(ctx), int64(res.Channel.Id), int64(in.Id), &prevItem, &nextItem)
 			if prevItem != nil {
-				prevItem.Image = optimizeImage(prevItem.Image, prevItem.Images)
-				formatArticleUrl(prevItem, res.Channel)
+				formatArticle(prevItem, nil, res.Channel)
 				res.Prev = prevItem
 			}
 			if nextItem != nil {
-				nextItem.Image = optimizeImage(nextItem.Image, nextItem.Images)
-				formatArticleUrl(nextItem, res.Channel)
+				formatArticle(nextItem, nil, res.Channel)
 				res.Next = nextItem
 			}
 
@@ -585,15 +690,7 @@ func (s *sApiSite) Content(ctx context.Context, in sitein.ContentInp) (res *site
 			return nil, gerror.New("内容不存在或已下架")
 		}
 
-		// 获取同级分类
-		dao.WebChannel.Ctx(ctx).Where("pid", res.Channel.Pid).Where("status", 1).Order("weigh desc, id asc").Scan(&res.RelatedList)
-		if res.RelatedList == nil {
-			res.RelatedList = make([]*entity.WebChannel, 0)
-		} else {
-			for _, relCh := range res.RelatedList {
-				formatChannelUrl(relCh)
-			}
-		}
+		res.RelatedList = getRelatedChannels(ctx, res.Channel.Pid)
 
 		// 获取热门内容
 		mHot := dao.WebArticle.Ctx(ctx).Where("status", 1).Where("channel_id", res.Channel.Id)
@@ -603,10 +700,7 @@ func (s *sApiSite) Content(ctx context.Context, in sitein.ContentInp) (res *site
 		if hotList == nil {
 			hotList = make([]*entity.WebArticle, 0)
 		}
-		for _, v := range hotList {
-			v.Image = optimizeImage(v.Image, v.Images)
-			formatArticleUrl(v, res.Channel)
-		}
+		formatArticles(hotList, nil, res.Channel)
 		res.HotList = hotList
 
 	} else if res.Channel.Model == "products" {
@@ -616,22 +710,18 @@ func (s *sApiSite) Content(ctx context.Context, in sitein.ContentInp) (res *site
 			return nil, err
 		}
 		if product != nil {
-			// 优化 Image 字段：如果 product.Image 为空，但 Images 不为空，则取 Images 的第一张图
-			product.Image = optimizeImage(product.Image, product.Images)
-			formatProductUrl(product, res.Channel)
+			formatProduct(product, nil, res.Channel)
 			res.Content = product
 
 			var prevItem *entity.WebProducts
 			var nextItem *entity.WebProducts
 			s.handlePrevNext(ctx, dao.WebProducts.Ctx(ctx), int64(res.Channel.Id), int64(in.Id), &prevItem, &nextItem)
 			if prevItem != nil {
-				prevItem.Image = optimizeImage(prevItem.Image, prevItem.Images)
-				formatProductUrl(prevItem, res.Channel)
+				formatProduct(prevItem, nil, res.Channel)
 				res.Prev = prevItem
 			}
 			if nextItem != nil {
-				nextItem.Image = optimizeImage(nextItem.Image, nextItem.Images)
-				formatProductUrl(nextItem, res.Channel)
+				formatProduct(nextItem, nil, res.Channel)
 				res.Next = nextItem
 			}
 
@@ -641,15 +731,7 @@ func (s *sApiSite) Content(ctx context.Context, in sitein.ContentInp) (res *site
 			return nil, gerror.New("内容不存在或已下架")
 		}
 
-		// 获取同级分类
-		dao.WebChannel.Ctx(ctx).Where("pid", res.Channel.Pid).Where("status", 1).Order("weigh desc, id asc").Scan(&res.RelatedList)
-		if res.RelatedList == nil {
-			res.RelatedList = make([]*entity.WebChannel, 0)
-		} else {
-			for _, relCh := range res.RelatedList {
-				formatChannelUrl(relCh)
-			}
-		}
+		res.RelatedList = getRelatedChannels(ctx, res.Channel.Pid)
 
 		// 获取热门内容
 		mHot := dao.WebProducts.Ctx(ctx).Where("status", 1).Where("channel_id", res.Channel.Id)
@@ -659,10 +741,7 @@ func (s *sApiSite) Content(ctx context.Context, in sitein.ContentInp) (res *site
 		if hotList == nil {
 			hotList = make([]*entity.WebProducts, 0)
 		}
-		for _, v := range hotList {
-			v.Image = optimizeImage(v.Image, v.Images)
-			formatProductUrl(v, res.Channel)
-		}
+		formatProducts(hotList, nil, res.Channel)
 		res.HotList = hotList
 
 	} else {
@@ -728,27 +807,7 @@ func (s *sApiSite) Search(ctx context.Context, in sitein.SearchInp) (res *sitein
 		}
 
 		if len(list) > 0 {
-			// 收集所有的 channel_id，批量查询栏目以格式化 URL
-			channelIdMap := make(map[uint]bool)
-			for _, item := range list {
-				channelIdMap[item.ChannelId] = true
-			}
-			var channelIds []uint
-			for cid := range channelIdMap {
-				channelIds = append(channelIds, cid)
-			}
-			var channels []*entity.WebChannel
-			_ = dao.WebChannel.Ctx(ctx).WhereIn("id", channelIds).Where("status", 1).Scan(&channels)
-			chMap := make(map[uint]*entity.WebChannel)
-			for _, ch := range channels {
-				formatChannelUrl(ch)
-				chMap[ch.Id] = ch
-			}
-
-			for _, item := range list {
-				item.Image = optimizeImage(item.Image, item.Images)
-				formatProductUrl(item, chMap[item.ChannelId])
-			}
+			formatProducts(list, getContentChannelMap(ctx, getProductChannelIds(list)), nil)
 		}
 		res.List = list
 	} else if searchType == "article" {
@@ -771,27 +830,7 @@ func (s *sApiSite) Search(ctx context.Context, in sitein.SearchInp) (res *sitein
 		}
 
 		if len(list) > 0 {
-			// 收集所有的 channel_id，批量查询栏目以格式化 URL
-			channelIdMap := make(map[uint]bool)
-			for _, item := range list {
-				channelIdMap[item.ChannelId] = true
-			}
-			var channelIds []uint
-			for cid := range channelIdMap {
-				channelIds = append(channelIds, cid)
-			}
-			var channels []*entity.WebChannel
-			_ = dao.WebChannel.Ctx(ctx).WhereIn("id", channelIds).Where("status", 1).Scan(&channels)
-			chMap := make(map[uint]*entity.WebChannel)
-			for _, ch := range channels {
-				formatChannelUrl(ch)
-				chMap[ch.Id] = ch
-			}
-
-			for _, item := range list {
-				item.Image = optimizeImage(item.Image, item.Images)
-				formatArticleUrl(item, chMap[item.ChannelId])
-			}
+			formatArticles(list, getContentChannelMap(ctx, getArticleChannelIds(list)), nil)
 		}
 		res.List = list
 	}

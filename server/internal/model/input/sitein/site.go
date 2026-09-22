@@ -67,9 +67,23 @@ type ContentInp struct {
 	Channel string
 }
 
+// ContentAuthor 内容作者公开信息
+type ContentAuthor struct {
+	Id            uint   `json:"id" dc:"作者ID"`
+	Username      string `json:"username" dc:"作者用户名"`
+	Nickname      string `json:"nickname" dc:"作者昵称"`
+	Avatar        string `json:"avatar" dc:"作者头像"`
+	Motto         string `json:"motto" dc:"作者签名"`
+	IsAdmin       bool   `json:"isAdmin" dc:"是否管理员作者"`
+	ArticleCount  int    `json:"articleCount" dc:"已发布文章数"`
+	ViewCount     int    `json:"viewCount" dc:"已发布文章阅读数"`
+	FollowerCount int    `json:"followerCount" dc:"粉丝数，当前未启用关注功能时为0"`
+}
+
 // ContentModel 获取内容详情出参
 type ContentModel struct {
 	Content     interface{}          `json:"content"`
+	Author      *ContentAuthor       `json:"author"`
 	Channel     *entity.WebChannel   `json:"channel"`
 	Breadcrumb  []*entity.WebChannel `json:"breadcrumb"`
 	RelatedList []*entity.WebChannel `json:"relatedList"`

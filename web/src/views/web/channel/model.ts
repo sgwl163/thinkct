@@ -28,6 +28,11 @@ export const visitGroupOptions = [
   { label: '仅会员', value: 'user' },
 ];
 
+export const modelOptions = [
+  { label: '文章模型', value: 'article' },
+  { label: '产品模型', value: 'products' },
+];
+
 export class State {
   public id = 0;
   public pid = 0;
@@ -48,13 +53,17 @@ export class State {
   public status = 1;
 
   constructor(state?: Partial<State>) {
-    if (state) { Object.assign(this, state); }
+    if (state) {
+      Object.assign(this, state);
+    }
   }
 }
 
 export function newState(state: State | Record<string, any> | null): State {
   if (state !== null) {
-    if (state instanceof State) { return cloneDeep(state); }
+    if (state instanceof State) {
+      return cloneDeep(state);
+    }
     return new State(state);
   }
   return new State();
@@ -63,6 +72,13 @@ export function newState(state: State | Record<string, any> | null): State {
 export const rules = {
   name: { required: true, trigger: ['blur', 'input'], type: 'string', message: '请输入频道名称' },
   type: { required: true, trigger: ['blur', 'change'], type: 'string', message: '请选择类型' },
+  model: { required: true, trigger: ['blur', 'change'], type: 'string', message: '请选择模型' },
+  template: {
+    required: true,
+    trigger: ['blur', 'input'],
+    type: 'string',
+    message: '请输入模板地址',
+  },
 };
 
 export const schemas = ref<FormSchema[]>([
@@ -83,61 +99,62 @@ export const schemas = ref<FormSchema[]>([
 
 export const columns = [
   {
-    title: '频道名称',
+    title: '栏目名称',
     key: 'name',
     align: 'left',
-    width: 160,
-  },
-  {
-    title: '模型',
-    key: 'model',
-    align: 'left',
-    width: 100,
-  },
-  {
-    title: '类型',
-    key: 'type',
-    align: 'center',
-    width: 100,
-    render(row: State) {
-      const label = channelTypeOptions.find((o) => o.value === row.type)?.label ?? row.type;
-      return h(NTag, { size: 'small' }, { default: () => label });
-    },
+    width: 220,
+    ellipsis: { tooltip: true },
   },
   {
     title: '自定义名称',
     key: 'diyname',
     align: 'left',
-    width: 130,
-  },
-  {
-    title: '模板',
-    key: 'template',
-    align: 'left',
-    width: 180,
+    width: 160,
     ellipsis: { tooltip: true },
   },
   {
-    title: '跳转链接',
-    key: 'url',
-    align: 'left',
-    width: 180,
-    ellipsis: { tooltip: true },
+    title: '模型',
+    key: 'model',
+    align: 'center',
+    width: 110,
+    render(row: State) {
+      const label = modelOptions.find((option) => option.value === row.model)?.label ?? row.model;
+      return h(NTag, { size: 'small', type: 'info' }, { default: () => label });
+    },
+  },
+  {
+    title: '类型',
+    key: 'type',
+    align: 'center',
+    width: 110,
+    render(row: State) {
+      const label =
+        channelTypeOptions.find((option) => option.value === row.type)?.label ?? row.type;
+      const type = row.type === 'cover' ? 'success' : row.type === 'link' ? 'warning' : 'info';
+      return h(NTag, { size: 'small', type }, { default: () => label });
+    },
   },
   {
     title: '访问策略',
     key: 'allowVisitGroups',
     align: 'center',
-    width: 90,
+    width: 100,
     render(row: State) {
-      return h(NTag, { size: 'small', type: row.allowVisitGroups === 'user' ? 'warning' : 'default' }, { default: () => (row.allowVisitGroups === 'user' ? '仅会员' : '全部') });
+      const label =
+        visitGroupOptions.find((option) => option.value === row.allowVisitGroups)?.label ??
+        row.allowVisitGroups;
+      return h(
+        NTag,
+        { size: 'small', type: row.allowVisitGroups === 'user' ? 'warning' : 'info' },
+        { default: () => label }
+      );
     },
   },
   {
     title: '权重',
     key: 'weigh',
     align: 'center',
-    width: 70,
+    width: 80,
   },
   {
     title: '状态',

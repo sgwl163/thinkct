@@ -73,16 +73,18 @@
                       </n-form-item>
                     </n-gi>
                     <n-gi :span="2">
-                      <n-form-item label="封面图片" path="images">
+                      <n-form-item label="封面图片" path="image">
                         <div style="width: 100%">
                           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <UploadImage v-model:value="formValue.image" :max-number="1" />
                             <UploadImage
-                              v-model:value="formValue.images"
+                              :value="imagesArray"
                               :max-number="20"
+                              @update:value="onImagesChange"
                             />
                           </div>
                           <n-text depth="3" style="font-size: 12px; margin-top: 6px; display: block">
-                            建议尺寸 800x800，可上传多张图片，第一张将作为列表封面图
+                            建议尺寸 800x800，第一张为封面，后面紧跟着为图集图片
                           </n-text>
                         </div>
                       </n-form-item>
@@ -264,8 +266,23 @@ loadChannelOptions();
   }
   loadTagsOptions();
 
-  // 封面图片不再需要数组转换，直接绑定 string (逗号分隔的 URL) 即可
-  // 因为底层的 UploadImage 组件支持通过 modelValue 处理逗号分隔的字符串
+  function parseImageList(value: string | string[] | null | undefined): string[] {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter(Boolean);
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
+    } catch {
+      // Keep compatibility with the legacy comma-separated storage format.
+    }
+    return value.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+
+  // 图集：字符串或 JSON 数组 <-> 数组互转
+  const imagesArray = computed<string[]>(() => parseImageList(formValue.value.images));
+  function onImagesChange(list: string | string[]) {
+    formValue.value.images = parseImageList(list).join(',');
+  }
 
   // 标志：逗号字符串 <-> 数组互转
   const flagArray = computed<string[]>(() => {
@@ -318,6 +335,9 @@ loadChannelOptions();
       if (!errors) {
         formBtnLoading.value = true;
         const submitData = cloneDeep(formValue.value);
+        const imageList = parseImageList(submitData.image);
+        submitData.image = imageList[0] || '';
+        submitData.images = parseImageList(submitData.images).join(',');
         if (submitData.publishTime) {
           submitData.publishTime = Math.floor(submitData.publishTime / 1000);
         }

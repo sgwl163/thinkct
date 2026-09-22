@@ -30,6 +30,7 @@ type WebArticleColumns struct {
 	Title       string // 标题
 	TitleStyle  string // 标题样式
 	Flag        string // 标志:top=置顶,hot=热门,recommend=推荐,new=最新
+	Image       string // 图片
 	Images      string // 封面图片
 	Content     string // 内容
 	Seotitle    string // SEO标题
@@ -60,6 +61,7 @@ var webArticleColumns = WebArticleColumns{
 	Title:       "title",
 	TitleStyle:  "title_style",
 	Flag:        "flag",
+	Image:       "image",
 	Images:      "images",
 	Content:     "content",
 	Seotitle:    "seotitle",

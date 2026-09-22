@@ -77,18 +77,15 @@ func (in *ChannelEditInp) Filter(ctx context.Context) (err error) {
 	if err := g.Validator().Rules("required").Data(in.Name).Messages("频道名称不能为空").Run(ctx); err != nil {
 		return err.Current()
 	}
+	// 验证模型
+	if err := g.Validator().Rules("required").Data(in.Model).Messages("模型不能为空").Run(ctx); err != nil {
+		return err.Current()
+	}
 	// 验证模板地址
 	if err := g.Validator().Rules("required").Data(in.Template).Messages("模板地址不能为空").Run(ctx); err != nil {
 		return err.Current()
 	}
-	// 验证跳转链接
-	if err := g.Validator().Rules("required").Data(in.Url).Messages("跳转链接不能为空").Run(ctx); err != nil {
-		return err.Current()
-	}
-	// 验证跳转方式:_blank=新标签页,_self=当前标签页,_top=当前窗体,_parent=父窗口
-	if err := g.Validator().Rules("required").Data(in.Target).Messages("跳转方式:_blank=新标签页,_self=当前标签页,_top=当前窗体,_parent=父窗口不能为空").Run(ctx); err != nil {
-		return err.Current()
-	}
+	// 跳转链接、跳转方式和访问策略为可选项
 	// 验证SEO标题
 	if err := g.Validator().Rules("required").Data(in.Seotitle).Messages("SEO标题不能为空").Run(ctx); err != nil {
 		return err.Current()
@@ -99,10 +96,6 @@ func (in *ChannelEditInp) Filter(ctx context.Context) (err error) {
 	}
 	// 验证描述
 	if err := g.Validator().Rules("required").Data(in.Description).Messages("描述不能为空").Run(ctx); err != nil {
-		return err.Current()
-	}
-	// 验证访问策略:all=全部,user=仅会员
-	if err := g.Validator().Rules("required").Data(in.AllowVisitGroups).Messages("访问策略:all=全部,user=仅会员不能为空").Run(ctx); err != nil {
 		return err.Current()
 	}
 	// 验证状态:0=禁用,1=启用

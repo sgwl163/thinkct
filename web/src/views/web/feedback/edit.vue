@@ -6,7 +6,7 @@
       :show-icon="false"
       preset="dialog"
       transform-origin="center"
-      :title="formValue.id > 0 ? '处理反馈 #' + formValue.id : '添加反馈'"
+      :title="formValue.id > 0 ? '处理留言 #' + formValue.id : '添加留言'"
       :style="{ width: dialogWidth }"
     >
       <n-scrollbar style="max-height: 87vh" class="pr-5">
@@ -20,39 +20,79 @@
             class="py-4"
           >
             <n-grid cols="1 s:1 m:2 l:2 xl:2 2xl:2" responsive="screen" :x-gap="12">
+              <n-gi span="2">
+                <n-divider title-placement="left">联系信息</n-divider>
+              </n-gi>
               <n-gi span="1">
                 <n-form-item label="姓名" path="name">
-                  <n-input placeholder="请输入姓名" v-model:value="formValue.name" />
+                  <n-input
+                    placeholder="请输入姓名"
+                    v-model:value="formValue.name"
+                    :disabled="formValue.id > 0"
+                  />
                 </n-form-item>
               </n-gi>
               <n-gi span="1">
                 <n-form-item label="手机号" path="phone">
-                  <n-input placeholder="请输入手机号" v-model:value="formValue.phone" />
+                  <n-input
+                    placeholder="请输入手机号"
+                    v-model:value="formValue.phone"
+                    :disabled="formValue.id > 0"
+                  />
                 </n-form-item>
               </n-gi>
               <n-gi span="1">
                 <n-form-item label="邮箱" path="email">
-                  <n-input placeholder="请输入邮箱" v-model:value="formValue.email" />
+                  <n-input
+                    placeholder="请输入邮箱"
+                    v-model:value="formValue.email"
+                    :disabled="formValue.id > 0"
+                  />
                 </n-form-item>
               </n-gi>
               <n-gi span="1">
                 <n-form-item label="公司名称" path="company">
-                  <n-input placeholder="请输入公司名称" v-model:value="formValue.company" />
+                  <n-input
+                    placeholder="请输入公司名称"
+                    v-model:value="formValue.company"
+                    :disabled="formValue.id > 0"
+                  />
                 </n-form-item>
+              </n-gi>
+              <n-gi span="2">
+                <n-divider title-placement="left">用户反馈</n-divider>
               </n-gi>
               <n-gi span="2">
                 <n-form-item label="反馈内容" path="content">
-                  <n-input type="textarea" :rows="4" v-model:value="formValue.content" :disabled="formValue.id > 0" />
+                  <n-input
+                    v-model:value="formValue.content"
+                    type="textarea"
+                    :rows="5"
+                    :disabled="formValue.id > 0"
+                    placeholder="请输入反馈内容"
+                  />
                 </n-form-item>
               </n-gi>
               <n-gi span="2">
+                <n-divider title-placement="left">处理结果</n-divider>
+              </n-gi>
+              <n-gi span="2">
                 <n-form-item label="回复内容" path="answer">
-                  <n-input type="textarea" placeholder="请输入回复内容" :rows="4" v-model:value="formValue.answer" />
+                  <n-input
+                    v-model:value="formValue.answer"
+                    type="textarea"
+                    placeholder="请输入回复内容"
+                    :rows="5"
+                  />
                 </n-form-item>
               </n-gi>
               <n-gi span="1">
-                <n-form-item label="状态" path="status">
-                  <n-select v-model:value="formValue.status" :options="feedbackStatusOptions" placeholder="请选择状态" />
+                <n-form-item label="处理状态" path="status">
+                  <n-select
+                    v-model:value="formValue.status"
+                    :options="feedbackStatusOptions"
+                    placeholder="请选择处理状态"
+                  />
                 </n-form-item>
               </n-gi>
             </n-grid>
@@ -97,7 +137,9 @@
             closeForm();
             emit('reloadTable');
           })
-          .finally(() => { formBtnLoading.value = false; });
+          .finally(() => {
+            formBtnLoading.value = false;
+          });
       } else {
         message.error('请填写完整信息');
       }
@@ -117,8 +159,12 @@
     }
     loading.value = true;
     View({ id: state.id })
-      .then((res) => { formValue.value = newState(res); })
-      .finally(() => { loading.value = false; });
+      .then((res) => {
+        formValue.value = newState(res);
+      })
+      .finally(() => {
+        loading.value = false;
+      });
   }
 
   defineExpose({ openModal });

@@ -50,6 +50,14 @@ type DeleteReq struct {
 
 type DeleteRes struct{}
 
+// DeleteBuildReq 删除已生成代码
+type DeleteBuildReq struct {
+	g.Meta `path:"/genCodes/deleteBuild" method:"post" tags:"生成代码" summary:"删除已生成代码"`
+	sysin.GenCodesDeleteBuildInp
+}
+
+type DeleteBuildRes struct{}
+
 // MaxSortReq 最大排序
 type MaxSortReq struct {
 	g.Meta `path:"/genCodes/maxSort" method:"get" tags:"生成代码" summary:"生成代码最大排序"`

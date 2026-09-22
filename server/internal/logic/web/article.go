@@ -129,6 +129,7 @@ func (s *sWebArticle) Edit(ctx context.Context, in *webin.ArticleEditInp) (err e
 
 		// 修改
 		if in.Id > 0 {
+			in.UpdateTime = uint64(gtime.Now().Unix())
 			if _, err = s.Model(ctx).
 				Fields(webin.ArticleUpdateFields{}).
 				WherePri(in.Id).Data(in).Update(); err != nil {

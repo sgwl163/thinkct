@@ -45,6 +45,17 @@ type GenCodesDeleteInp struct {
 
 type GenCodesDeleteModel struct{}
 
+// GenCodesDeleteBuildInp 删除已生成代码
+type GenCodesDeleteBuildInp struct {
+	Id int64 `json:"id" v:"required#生成代码ID不能为空" dc:"生成代码ID"`
+}
+
+func (in *GenCodesDeleteBuildInp) Filter(ctx context.Context) (err error) {
+	return
+}
+
+type GenCodesDeleteBuildModel struct{}
+
 // GenCodesViewInp 获取信息
 type GenCodesViewInp struct {
 	Id int64 `json:"id" v:"required#生成代码ID不能为空" dc:"生成代码ID"`

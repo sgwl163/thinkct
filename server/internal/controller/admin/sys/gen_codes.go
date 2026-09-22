@@ -23,6 +23,12 @@ func (c *cGenCodes) Delete(ctx context.Context, req *gencodes.DeleteReq) (res *g
 	return
 }
 
+// DeleteBuild 删除已生成代码
+func (c *cGenCodes) DeleteBuild(ctx context.Context, req *gencodes.DeleteBuildReq) (res *gencodes.DeleteBuildRes, err error) {
+	err = service.SysGenCodes().DeleteBuild(ctx, &req.GenCodesDeleteBuildInp)
+	return
+}
+
 // Edit 更新
 func (c *cGenCodes) Edit(ctx context.Context, req *gencodes.EditReq) (res *gencodes.EditRes, err error) {
 	data, err := service.SysGenCodes().Edit(ctx, &req.GenCodesEditInp)

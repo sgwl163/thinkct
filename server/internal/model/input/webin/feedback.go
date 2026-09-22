@@ -8,10 +8,8 @@ package webin
 
 import (
 	"context"
-	"hotgo/internal/consts"
 	"hotgo/internal/model/entity"
 	"hotgo/internal/model/input/form"
-	"hotgo/utility/validate"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
@@ -53,18 +51,14 @@ type FeedbackEditInp struct {
 func (in *FeedbackEditInp) Filter(ctx context.Context) (err error) {
 	// 验证邮箱
 	if err := g.Validator().Rules("email").Data(in.Email).Messages("邮箱不是邮箱地址").Run(ctx); err != nil {
-		return err.Current()
+		return err
 	}
-	// 验证备注
-	if err := g.Validator().Rules("required").Data(in.Answer).Messages("备注不能为空").Run(ctx); err != nil {
-		return err.Current()
+	// 已回复的留言必须填写回复内容
+	if in.Status == 1 && in.Answer == "" {
+		return gerror.New("回复内容不能为空")
 	}
-	// 验证状态:0=禁用,1=启用
-	if err := g.Validator().Rules("required").Data(in.Status).Messages("状态:0=禁用,1=启用不能为空").Run(ctx); err != nil {
-		return err.Current()
-	}
-	if err := g.Validator().Rules("in:1,2").Data(in.Status).Messages("状态:0=禁用,1=启用值不正确").Run(ctx); err != nil {
-		return err.Current()
+	if err := g.Validator().Rules("in:0,1,2").Data(in.Status).Messages("处理状态不正确").Run(ctx); err != nil {
+		return err
 	}
 	return
 }
@@ -98,8 +92,11 @@ type FeedbackViewModel struct {
 // FeedbackListInp 获取留言管理列表
 type FeedbackListInp struct {
 	form.PageReq
-	Id     int `json:"id"     dc:"ID"`
-	Status int `json:"status" dc:"状态:0=禁用,1=启用"`
+	Id         int      `json:"id"         dc:"ID"`
+	Name       string   `json:"name"       dc:"名称"`
+	Phone      string   `json:"phone"      dc:"手机号"`
+	Status     *int     `json:"status"     dc:"处理状态"`
+	CreateTime []string `json:"createTime" dc:"创建时间"`
 }
 
 func (in *FeedbackListInp) Filter(ctx context.Context) (err error) {
@@ -112,9 +109,10 @@ type FeedbackListModel struct {
 	Email      string `json:"email"      dc:"邮箱"`
 	Phone      string `json:"phone"      dc:"手机号"`
 	Company    string `json:"company"    dc:"公司名称"`
-	Answer     string `json:"answer"     dc:"备注"`
+	Content    string `json:"content"    dc:"反馈内容"`
+	Answer     string `json:"answer"     dc:"回复内容"`
 	Ip         string `json:"ip"         dc:"IP"`
-	Status     int    `json:"status"     dc:"状态:0=禁用,1=启用"`
+	Status     int    `json:"status"     dc:"处理状态"`
 	CreateTime int64  `json:"createTime" dc:"创建时间"`
 	UpdateTime int64  `json:"updateTime" dc:"修改时间"`
 }
@@ -126,9 +124,10 @@ type FeedbackExportModel struct {
 	Email      string `json:"email"      dc:"邮箱"`
 	Phone      string `json:"phone"      dc:"手机号"`
 	Company    string `json:"company"    dc:"公司名称"`
-	Answer     string `json:"answer"     dc:"备注"`
+	Content    string `json:"content"    dc:"反馈内容"`
+	Answer     string `json:"answer"     dc:"回复内容"`
 	Ip         string `json:"ip"         dc:"IP"`
-	Status     int    `json:"status"     dc:"状态:0=禁用,1=启用"`
+	Status     int    `json:"status"     dc:"处理状态"`
 	CreateTime int64  `json:"createTime" dc:"创建时间"`
 	UpdateTime int64  `json:"updateTime" dc:"修改时间"`
 }
@@ -141,18 +140,10 @@ type FeedbackStatusInp struct {
 
 func (in *FeedbackStatusInp) Filter(ctx context.Context) (err error) {
 	if in.Id <= 0 {
-		err = gerror.New("ID不能为空")
-		return
+		return gerror.New("ID不能为空")
 	}
-
-	if in.Status <= 0 {
-		err = gerror.New("状态不能为空")
-		return
-	}
-
-	if !validate.InSlice(consts.StatusSlice, in.Status) {
-		err = gerror.New("状态不正确")
-		return
+	if validateErr := g.Validator().Rules("in:0,1,2").Data(in.Status).Messages("处理状态不正确").Run(ctx); validateErr != nil {
+		return validateErr.Current()
 	}
 	return
 }

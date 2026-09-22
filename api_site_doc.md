@@ -225,10 +225,11 @@
   1. 通过传入的 `channel` 自动判断内容的类型（`article` 还是 `products`），并根据 `id` 获取对应的内容详情。
   2. 接口会自动让被访问内容的浏览量 (`views`) + 1。
   3. 响应中包含内容主体 `content`，同时也会关联返回其所属的栏目详情 `channel`。文章和产品的 `url` 字段格式为 `/{diyname}/detail/{内容ID}`。
-  4. `breadcrumb` 为从根栏目（顶级栏目）到当前访问栏目的层级数组，便于前端直接渲染面包屑导航路径。
-  5. 响应中包含 `prev` (上一篇) 和 `next` (下一篇) 数据。
-  6. 响应中包含 `relatedList` (同级分类) 和 `hotList` (热门内容) 列表。
-  7. 如果栏目不存在/已禁用，或者内容不存在/被下架，接口会直接返回报错。
+  4. 当内容为文章时，响应中的 `author` 返回作者公开资料，包括 `id`、`username`、`nickname`、`avatar`、`motto`、`isAdmin`、`articleCount`、`viewCount` 和 `followerCount`。`followerCount` 当前固定为 `0`，等待关注功能启用后提供实际统计。产品内容的 `author` 为 `null`。
+  5. `breadcrumb` 为从根栏目（顶级栏目）到当前访问栏目的层级数组，便于前端直接渲染面包屑导航路径。
+  6. 响应中包含 `prev` (上一篇) 和 `next` (下一篇) 数据。
+  7. 响应中包含 `relatedList` (同级分类) 和 `hotList` (热门内容) 列表。
+  8. 如果栏目不存在/已禁用，或者内容不存在/被下架，接口会直接返回报错。
 - **响应体示例**:
   ```json
   {
@@ -241,6 +242,17 @@
         "content": "<p>文章的富文本内容...</p>",
         "views": 100,
         "url": "/news/detail/1"
+      },
+      "author": {
+        "id": 1,
+        "username": "tigshop",
+        "nickname": "Tigshop",
+        "avatar": "https://example.com/avatar.png",
+        "motto": "",
+        "isAdmin": true,
+        "articleCount": 239,
+        "viewCount": 797100,
+        "followerCount": 0
       },
       "channel": {
         "id": 1,

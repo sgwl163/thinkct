@@ -72,7 +72,7 @@
         </template>
       </BasicTable>
     </n-card>
-    <Edit ref="editRef" @reloadTable="reloadTable" />
+    <Edit ref="editRef" @reload-table="reloadTable" />
     <View ref="viewRef" />
   </div>
 </template>
@@ -81,15 +81,13 @@
   import { BasicTable, TableAction } from '@/components/Table';
   import { BasicForm, useForm } from '@/components/Form/index';
   import { usePermission } from '@/hooks/web/usePermission';
-  import { useDictStore } from '@/store/modules/dict';
   import { List, Export, Delete, Status } from '@/api/web/feedback';
   import { PlusOutlined, ExportOutlined, DeleteOutlined } from '@vicons/antd';
-  import { columns, schemas, State, loadOptions } from './model';
+  import { columns, schemas, State, loadOptions, getStatusLabel } from './model';
   import { adaTableScrollX } from '@/utils/hotgo';
   import Edit from './edit.vue';
   import View from './view.vue';
 
-  const dict = useDictStore();
   const dialog = useDialog();
   const message = useMessage();
   const { hasPermission } = usePermission();
@@ -109,25 +107,14 @@
         style: 'button',
         actions: [
           {
-            label: '编辑',
+            label: '处理',
             onClick: handleEdit.bind(null, record),
             auth: ['/feedback/edit'],
           },
-
           {
-            label: '禁用',
+            label: '关闭',
             onClick: handleStatus.bind(null, record, 2),
-            ifShow: () => {
-              return record.status === 1;
-            },
-            auth: ['/feedback/status'],
-          },
-          {
-            label: '启用',
-            onClick: handleStatus.bind(null, record, 1),
-            ifShow: () => {
-              return record.status === 2;
-            },
+            ifShow: () => record.status !== 2,
             auth: ['/feedback/status'],
           },
           {
@@ -210,7 +197,7 @@
 
   // 批量删除
   function handleBatchDelete() {
-    if (checkedIds.value.length < 1){
+    if (checkedIds.value.length < 1) {
       message.error('请至少选择一项要删除的数据');
       return;
     }
@@ -239,7 +226,7 @@
   // 修改状态
   function handleStatus(record: Recordable, status: number) {
     Status({ id: record.id, status: status }).then((_res) => {
-      message.success('设为' + dict.getLabel('sys_normal_disable', status) + '成功');
+      message.success('已设为' + getStatusLabel(status));
       setTimeout(() => {
         reloadTable();
       });
@@ -248,7 +235,6 @@
 
   onMounted(() => {
     loadOptions();
-    
   });
 </script>
 
