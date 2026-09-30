@@ -385,13 +385,13 @@
         //   icon: 'SearchOutlined',
         //   tips: '搜索',
         // },
-        {
-          icon: 'GithubOutlined',
-          tips: 'github',
-          eventObject: {
-            click: () => window.open('https://github.com/bufanyun/hotgo'),
-          },
-        },
+        // {
+        //   icon: 'GithubOutlined',
+        //   tips: 'github',
+        //   eventObject: {
+        //     click: () => window.open('https://github.com/bufanyun/hotgo'),
+        //   },
+        // },
         {
           icon: 'BellOutlined',
           tips: '我的消息',

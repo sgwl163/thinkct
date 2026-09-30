@@ -41,6 +41,13 @@ func (c *cSite) Config(ctx context.Context, _ *common.SiteConfigReq) (res *commo
 		Domain:  c.getDomain(ctx, request),
 		Mode:    gmode.Mode(),
 	}
+	basic, err := service.SysConfig().GetBasic(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if basic != nil {
+		res.Favicon = basic.Favicon
+	}
 	return
 }
 

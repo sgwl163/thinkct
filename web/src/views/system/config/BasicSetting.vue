@@ -10,6 +10,15 @@
           <FileChooser v-model:value="formValue.basicLogo" file-type="image" />
         </n-form-item>
 
+        <n-form-item label="网站图标" path="basicFavicon">
+          <FileChooser
+            v-model:value="formValue.basicFavicon"
+            file-type="image"
+            accept=".ico"
+          />
+          <template #feedback>请上传 `.ico` 格式图标，建议尺寸为 32 × 32 像素</template>
+        </n-form-item>
+
         <n-form-item label="网站域名" path="basicDomain">
           <n-input v-model:value="formValue.basicDomain" placeholder="请输入网站域名" />
           <template #feedback>
@@ -73,6 +82,7 @@
   const formValue = ref({
     basicName: 'HotGo',
     basicLogo: '',
+    basicFavicon: '',
     basicDomain: 'https://hotgo.facms.cn',
     basicWsAddr: 'wss://hotgo.facms.cn/socket',
     basicIcpCode: '',
@@ -114,6 +124,7 @@
     formRef.value.validate((errors) => {
       if (!errors) {
         updateConfig({ group: group.value, list: formValue.value }).then((_res) => {
+          updateFavicon(formValue.value.basicFavicon);
           message.success('更新成功');
           load();
         });
@@ -121,6 +132,16 @@
         message.error('验证失败，请填写完整信息');
       }
     });
+  }
+
+  function updateFavicon(url: string) {
+    if (!url) {
+      return;
+    }
+    const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (favicon) {
+      favicon.href = url;
+    }
   }
 
   onMounted(() => {
@@ -133,6 +154,7 @@
       getConfig({ group: group.value })
         .then((res) => {
           formValue.value = res.list;
+          updateFavicon(formValue.value.basicFavicon);
         })
         .finally(() => {
           show.value = false;

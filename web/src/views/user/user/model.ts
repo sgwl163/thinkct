@@ -2,14 +2,12 @@ import { h, ref } from 'vue';
 import { NSwitch } from 'naive-ui';
 import { cloneDeep } from 'lodash-es';
 import { FormSchema } from '@/components/Form';
-import { defRangeShortcuts } from '@/utils/dateUtil';
+import { defRangeShortcuts, formatToDateTime } from '@/utils/dateUtil';
 import { renderImage, renderOptionTag } from '@/utils';
 import { validate } from '@/utils/validateUtil';
 import { Status } from '@/api/user/user';
 import { useDictStore } from '@/store/modules/dict';
 import { usePermission } from '@/hooks/web/usePermission';
-
-import { timestampToTime } from '@/utils/dateUtil';
 
 const dict = useDictStore();
 const { hasPermission } = usePermission();
@@ -38,12 +36,12 @@ export class State {
   public birthday = '';
   public money = 0;
   public score = 0;
-  public createTime = 0;
-  public lastLoginTime = 0;
+  public createdAt = '';
+  public lastLoginAt = '';
   public lastLoginIp = '';
   public loginFailure = 0;
   public joinIp = '';
-  public joinTime = 0;
+  public joinedAt = '';
   public motto = '';
   public password = '';
   public status = 'enable';
@@ -109,7 +107,7 @@ export const schemas = ref<FormSchema[]>([
     componentProps: { placeholder: '请选择状态', options: userStatusOptions },
   },
   {
-    field: 'createTime',
+    field: 'createdAt',
     component: 'NDatePicker',
     label: '注册时间',
     componentProps: {
@@ -188,11 +186,11 @@ export const columns = [
   },
   {
     title: '注册时间',
-    key: 'createTime',
+    key: 'createdAt',
     align: 'left',
     width: 160,
     render(row: State) {
-      return row.createTime > 0 ? timestampToTime(row.createTime) : '-';
+      return row.createdAt ? formatToDateTime(row.createdAt) : '-';
     },
   },
   {
@@ -203,11 +201,11 @@ export const columns = [
   },
   {
     title: '上次登录时间',
-    key: 'lastLoginTime',
+    key: 'lastLoginAt',
     align: 'left',
     width: 160,
     render(row: State) {
-      return row.lastLoginTime > 0 ? timestampToTime(row.lastLoginTime) : '-';
+      return row.lastLoginAt ? formatToDateTime(row.lastLoginAt) : '-';
     },
   },
   {

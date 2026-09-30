@@ -6,12 +6,12 @@ package logic
 
 import (
 	_ "hotgo/internal/logic/admin"
+	_ "hotgo/internal/logic/app"
 	_ "hotgo/internal/logic/common"
 	_ "hotgo/internal/logic/forum"
 	_ "hotgo/internal/logic/hook"
 	_ "hotgo/internal/logic/im"
 	_ "hotgo/internal/logic/middleware"
-	_ "hotgo/internal/logic/oauth"
 	_ "hotgo/internal/logic/openai"
 	_ "hotgo/internal/logic/pay"
 	_ "hotgo/internal/logic/shop"

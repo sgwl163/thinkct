@@ -78,8 +78,11 @@ func (s *sOpenai) doVideoTask(ctx context.Context, taskId int64) {
 		return
 	}
 
-	apiKey := g.Cfg().MustGet(ctx, "openai.apiKey").String()
-	baseUrl := g.Cfg().MustGet(ctx, "openai.baseUrl").String()
+	apiKey, baseUrl, err := getModelConfig(ctx)
+	if err != nil {
+		s.markVideoFailed(ctx, taskId, "读取模型配置失败: "+err.Error())
+		return
+	}
 
 	if apiKey == "" || baseUrl == "" {
 		s.markVideoFailed(ctx, taskId, "配置不完整(apiKey or baseUrl)")

@@ -84,6 +84,8 @@
     :width="dialogWidth"
     :finish-call="handleFinishCall"
     :max-upload="20"
+    :upload-type="fileType"
+    :accept="accept"
   />
 
   <Preview ref="previewRef" />
@@ -114,6 +116,7 @@
     fileType?: FileType;
     width?: number;
     height?: number;
+    accept?: string;
   }
 
   const props = withDefaults(defineProps<Props>(), {
@@ -122,6 +125,7 @@
     fileType: 'default',
     width: 100,
     height: 100,
+    accept: undefined,
   });
 
   const emit = defineEmits(['update:value']);

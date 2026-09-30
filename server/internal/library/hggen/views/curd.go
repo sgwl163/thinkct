@@ -511,14 +511,11 @@ func (l *gCurd) DoBuild(ctx context.Context, in *CurdBuildInput) (err error) {
 		return
 	}
 
-	// 将sql文件提取出来优先处理
-	// sql执行过程出错是高概率事件，后期在执行前要进行预效验，尽量减少在执行过程中出错的可能性
+	// 菜单 SQL 需要在所有代码、DAO 和 service 均成功后才导入，
+	// 避免后续生成失败时留下已入库菜单，导致重试时路由别名冲突。
 	sqlGenFile, ok := preview.Views["source.sql"]
 	if ok {
 		delete(preview.Views, "source.sql")
-		if err = handleSqlFile(sqlGenFile); err != nil {
-			return
-		}
 	}
 
 	for _, vi := range preview.Views {
@@ -542,6 +539,13 @@ func (l *gCurd) DoBuild(ctx context.Context, in *CurdBuildInput) (err error) {
 			}
 		}
 	}
+	// 菜单 SQL 最后处理。只有全部文件写入及后置生成成功，才创建文件并导入菜单。
+	if ok {
+		if err = handleSqlFile(sqlGenFile); err != nil {
+			return
+		}
+	}
+
 	g.Log().Debugf(ctx, "generate code operation completed, %vms", gtime.Now().Sub(st).Milliseconds())
 	return
 }

@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 )
 
 func main() {
-	apiKey := "sk-S1rEFxwonvQR3wTx6d7d8a32C3E74c4389F1AeC7Fe7a1786"
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		panic("OPENAI_API_KEY is required")
+	}
 
 	testCases := []struct {
 		name string
@@ -39,7 +43,7 @@ func main() {
 			fmt.Println("  Error:", err)
 			continue
 		}
-		
+
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		fmt.Printf("  Status: %d\n  Response: %s\n\n", resp.StatusCode, string(body))

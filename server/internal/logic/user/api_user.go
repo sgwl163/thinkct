@@ -66,15 +66,15 @@ func (s *sApiUser) Login(ctx context.Context, req *v1.LoginReq) (res *v1.LoginRe
 	now := gtime.Now()
 	request := ghttp.RequestFromCtx(ctx)
 	_, _ = dao.User.Ctx(ctx).WherePri(user.Id).Data(g.Map{
-		cols.LastLoginTime: now.Unix(),
-		cols.LastLoginIp:   request.GetClientIp(),
-		cols.LoginFailure:  0,
-		cols.UpdateTime:    now.Unix(),
+		cols.LastLoginAt:  now,
+		cols.LastLoginIp:  request.GetClientIp(),
+		cols.LoginFailure: 0,
+		cols.UpdatedAt:    now,
 	}).Update()
 	s.writeLoginLog(ctx, user, "")
 
 	return &v1.LoginRes{
-		Token: loginToken, Expire: expires, Id: int64(user.Id), Username: user.Username,
+		Token: loginToken, Expire: expires, TokenExpireAt: gtime.Timestamp() + expires, Id: int64(user.Id), Username: user.Username,
 		Nickname: user.Nickname, Avatar: user.Avatar, Mobile: user.Mobile, Email: user.Email,
 		Money: user.Money, Score: user.Score,
 	}, nil
@@ -110,8 +110,8 @@ func (s *sApiUser) Register(ctx context.Context, req *v1.RegisterReq) (res *v1.R
 	userID, err := dao.User.Ctx(ctx).Data(g.Map{
 		cols.Username: req.Username, cols.Password: gmd5.MustEncryptString(req.Password + salt),
 		cols.Salt: salt, cols.Nickname: req.Nickname, cols.Mobile: req.Mobile, cols.Email: req.Email,
-		cols.Status: "enable", cols.CreateTime: now.Unix(), cols.UpdateTime: now.Unix(),
-		cols.JoinTime: now.Unix(), cols.JoinIp: request.GetClientIp(),
+		cols.Status: "enable", cols.CreatedAt: now, cols.UpdatedAt: now,
+		cols.JoinedAt: now, cols.JoinIp: request.GetClientIp(),
 	}).InsertAndGetId()
 	if err != nil {
 		return nil, gerror.Wrap(err, "注册失败，请稍后重试")
@@ -123,13 +123,19 @@ func (s *sApiUser) Register(ctx context.Context, req *v1.RegisterReq) (res *v1.R
 		return nil, gerror.Wrap(err, "注册成功后登录失败，请重新登录")
 	}
 	s.writeLoginLog(ctx, user, "")
-	return &v1.RegisterRes{Token: loginToken, Expire: expires, Id: userID, Username: req.Username, Nickname: req.Nickname, Mobile: req.Mobile, Email: req.Email}, nil
+	s.writeUserLog(ctx, user, consts.UserLogTypeOperation, consts.UserLogActionRegister, "用户注册", "", "")
+	return &v1.RegisterRes{Token: loginToken, Expire: expires, TokenExpireAt: gtime.Timestamp() + expires, Id: userID, Username: req.Username, Nickname: req.Nickname, Mobile: req.Mobile, Email: req.Email}, nil
 }
 
 func (s *sApiUser) Logout(ctx context.Context, _ *v1.LogoutReq) (res *v1.LogoutRes, err error) {
+	user, err := s.currentUser(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if err = token.Logout(ghttp.RequestFromCtx(ctx)); err != nil {
 		return nil, err
 	}
+	s.writeUserLog(ctx, user, consts.UserLogTypeOperation, consts.UserLogActionLogout, "退出登录", "", "")
 	return &v1.LogoutRes{}, nil
 }
 
@@ -141,7 +147,7 @@ func (s *sApiUser) UpdateInfo(ctx context.Context, req *v1.UpdateInfoReq) (res *
 	cols := dao.User.Columns()
 	if _, err = dao.User.Ctx(ctx).WherePri(user.Id).Data(g.Map{
 		cols.Nickname: req.Nickname, cols.Avatar: req.Avatar, cols.Gender: req.Gender,
-		cols.Birthday: req.Birthday, cols.Motto: req.Motto, cols.UpdateTime: gtime.Now().Unix(),
+		cols.Birthday: req.Birthday, cols.Motto: req.Motto, cols.UpdatedAt: gtime.Now(),
 	}).Update(); err != nil {
 		return nil, gerror.Wrap(err, "修改用户信息失败，请稍后重试")
 	}
@@ -162,9 +168,10 @@ func (s *sApiUser) UpdatePwd(ctx context.Context, req *v1.UpdatePwdReq) (res *v1
 	if err = s.savePassword(ctx, user, req.NewPassword); err != nil {
 		return nil, err
 	}
-	if err = token.Logout(ghttp.RequestFromCtx(ctx)); err != nil {
-		return nil, err
+	if err = token.RevokeAll(ctx, consts.AppApi, int64(user.Id)); err != nil {
+		return nil, gerror.Wrap(err, "密码已修改，但注销其他登录状态失败")
 	}
+	s.writeUserLog(ctx, user, consts.UserLogTypeOperation, consts.UserLogActionPassword, "修改登录密码", "", "")
 	return &v1.UpdatePwdRes{}, nil
 }
 
@@ -195,6 +202,10 @@ func (s *sApiUser) ResetPwd(ctx context.Context, req *v1.ResetPwdReq) (res *v1.R
 	if err = s.savePassword(ctx, user, req.Password); err != nil {
 		return nil, err
 	}
+	if err = token.RevokeAll(ctx, consts.AppApi, int64(user.Id)); err != nil {
+		return nil, gerror.Wrap(err, "密码已重置，但注销已有登录状态失败")
+	}
+	s.writeUserLog(ctx, user, consts.UserLogTypeOperation, consts.UserLogActionPassword, "重置登录密码", "", "")
 	return &v1.ResetPwdRes{}, nil
 }
 
@@ -232,7 +243,7 @@ func (s *sApiUser) BindMobile(ctx context.Context, req *v1.BindMobileReq) (res *
 	if err = service.SysSmsLog().VerifyCode(ctx, &sysin.VerifyCodeInp{Event: consts.SmsTemplateBind, Mobile: req.Mobile, Code: req.Code}); err != nil {
 		return nil, err
 	}
-	if _, err = dao.User.Ctx(ctx).WherePri(user.Id).Data(g.Map{dao.User.Columns().Mobile: req.Mobile, dao.User.Columns().UpdateTime: gtime.Now().Unix()}).Update(); err != nil {
+	if _, err = dao.User.Ctx(ctx).WherePri(user.Id).Data(g.Map{dao.User.Columns().Mobile: req.Mobile, dao.User.Columns().UpdatedAt: gtime.Now()}).Update(); err != nil {
 		return nil, gerror.Wrap(err, "换绑手机号失败，请稍后重试")
 	}
 	return &v1.BindMobileRes{}, nil
@@ -272,7 +283,7 @@ func (s *sApiUser) BindEmail(ctx context.Context, req *v1.BindEmailReq) (res *v1
 	if err = service.SysEmsLog().VerifyCode(ctx, &sysin.VerifyEmsCodeInp{Event: consts.EmsTemplateBind, Email: req.Email, Code: req.Code}); err != nil {
 		return nil, err
 	}
-	if _, err = dao.User.Ctx(ctx).WherePri(user.Id).Data(g.Map{dao.User.Columns().Email: req.Email, dao.User.Columns().UpdateTime: gtime.Now().Unix()}).Update(); err != nil {
+	if _, err = dao.User.Ctx(ctx).WherePri(user.Id).Data(g.Map{dao.User.Columns().Email: req.Email, dao.User.Columns().UpdatedAt: gtime.Now()}).Update(); err != nil {
 		return nil, gerror.Wrap(err, "换绑邮箱失败，请稍后重试")
 	}
 	return &v1.BindEmailRes{}, nil
@@ -321,14 +332,16 @@ func (s *sApiUser) LoginLogList(ctx context.Context, req *v1.LoginLogListReq) (r
 	if err != nil {
 		return nil, err
 	}
-	mod := dao.UserLoginLog.Ctx(ctx).Where(dao.UserLoginLog.Columns().UserId, user.Id)
+	mod := dao.UserLog.Ctx(ctx).
+		Where(dao.UserLog.Columns().UserId, user.Id).
+		Where(dao.UserLog.Columns().LogType, consts.UserLogTypeLogin)
 	total, err := mod.Clone().Count()
 	if err != nil {
 		return nil, gerror.Wrap(err, "获取登录历史失败，请稍后重试")
 	}
-	list := make([]*entity.UserLoginLog, 0)
+	list := make([]*entity.UserLog, 0)
 	if total > 0 {
-		if err = mod.Page(req.Page, req.PerPage).OrderDesc(dao.UserLoginLog.Columns().Id).Scan(&list); err != nil {
+		if err = mod.Page(req.Page, req.PerPage).OrderDesc(dao.UserLog.Columns().Id).Scan(&list); err != nil {
 			return nil, gerror.Wrap(err, "获取登录历史失败，请稍后重试")
 		}
 	}
@@ -345,12 +358,13 @@ func (s *sApiUser) Cancel(ctx context.Context, req *v1.CancelReq) (res *v1.Cance
 	if user.Password != gmd5.MustEncryptString(req.Password+user.Salt) {
 		return nil, gerror.New("登录密码不正确")
 	}
-	if _, err = dao.User.Ctx(ctx).WherePri(user.Id).Data(g.Map{dao.User.Columns().Status: "disable", dao.User.Columns().UpdateTime: gtime.Now().Unix()}).Update(); err != nil {
+	if _, err = dao.User.Ctx(ctx).WherePri(user.Id).Data(g.Map{dao.User.Columns().Status: "disable", dao.User.Columns().UpdatedAt: gtime.Now()}).Update(); err != nil {
 		return nil, gerror.Wrap(err, "注销账号失败，请稍后重试")
 	}
-	if err = token.Logout(ghttp.RequestFromCtx(ctx)); err != nil {
-		return nil, err
+	if err = token.RevokeAll(ctx, consts.AppApi, int64(user.Id)); err != nil {
+		return nil, gerror.Wrap(err, "账号已注销，但注销已有登录状态失败")
 	}
+	s.writeUserLog(ctx, user, consts.UserLogTypeOperation, consts.UserLogActionCancel, "注销账号", "", "")
 	return &v1.CancelRes{}, nil
 }
 
@@ -389,8 +403,8 @@ func (s *sApiUser) ensureUniqueUser(ctx context.Context, column, value string, u
 
 func (s *sApiUser) savePassword(ctx context.Context, user *entity.User, password string) error {
 	if _, err := dao.User.Ctx(ctx).WherePri(user.Id).Data(g.Map{
-		dao.User.Columns().Password:   gmd5.MustEncryptString(password + user.Salt),
-		dao.User.Columns().UpdateTime: gtime.Now().Unix(),
+		dao.User.Columns().Password:  gmd5.MustEncryptString(password + user.Salt),
+		dao.User.Columns().UpdatedAt: gtime.Now(),
 	}).Update(); err != nil {
 		return gerror.Wrap(err, "修改密码失败，请稍后重试")
 	}
@@ -398,24 +412,40 @@ func (s *sApiUser) savePassword(ctx context.Context, user *entity.User, password
 }
 
 func (s *sApiUser) identity(user *entity.User) *model.Identity {
-	return &model.Identity{Id: int64(user.Id), Username: user.Username, RealName: user.Nickname, Avatar: user.Avatar, Email: user.Email, Mobile: user.Mobile, App: consts.AppApi, LoginAt: gtime.Now()}
+	now := gtime.Now()
+	return &model.Identity{Id: int64(user.Id), Username: user.Username, RealName: user.Nickname, Avatar: user.Avatar, Email: user.Email, Mobile: user.Mobile, App: consts.AppApi, LoginAt: now, TokenIssuedAt: now.TimestampNano()}
 }
 
 func (s *sApiUser) infoRes(user *entity.User) *v1.InfoRes {
-	return &v1.InfoRes{Id: int64(user.Id), Username: user.Username, Nickname: user.Nickname, Avatar: user.Avatar, Mobile: user.Mobile, Email: user.Email, Gender: user.Gender, Birthday: user.Birthday, Motto: user.Motto, Money: user.Money, Score: user.Score}
+	return &v1.InfoRes{
+		Id: int64(user.Id), Username: user.Username, Nickname: user.Nickname, Avatar: user.Avatar,
+		Mobile: user.Mobile, Email: user.Email, Gender: user.Gender, Birthday: user.Birthday,
+		Motto: user.Motto, JoinedAt: user.JoinedAt, LastLoginAt: user.LastLoginAt,
+		LastLoginIp: user.LastLoginIp, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
+		Money: user.Money, Score: user.Score,
+	}
 }
 
 func (s *sApiUser) writeLoginLog(ctx context.Context, user *entity.User, errMsg string) {
+	s.writeUserLog(ctx, user, consts.UserLogTypeLogin, consts.UserLogActionLogin, "用户登录", errMsg, "")
+}
+
+func (s *sApiUser) writeUserLog(ctx context.Context, user *entity.User, logType, action, actionName, message, extra string) {
 	request := ghttp.RequestFromCtx(ctx)
 	if request == nil {
 		return
 	}
 	status := consts.StatusEnabled
-	if errMsg != "" {
+	if message != "" {
 		status = consts.StatusDisable
 	}
-	if _, err := dao.UserLoginLog.Ctx(ctx).Data(&entity.UserLoginLog{UserId: int64(user.Id), Username: user.Username, LoginAt: gtime.Now(), LoginIp: request.GetClientIp(), UserAgent: request.UserAgent(), ErrMsg: errMsg, Status: status, CreatedAt: gtime.Now(), UpdatedAt: gtime.Now()}).Insert(); err != nil {
-		g.Log().Warningf(ctx, "写入用户登录日志失败 userId:%d err:%+v", user.Id, err)
+	now := gtime.Now()
+	if _, err := dao.UserLog.Ctx(ctx).Data(&entity.UserLog{
+		UserId: int64(user.Id), Username: user.Username, LogType: logType, Action: action,
+		ActionName: actionName, EventAt: now, Ip: request.GetClientIp(), UserAgent: request.UserAgent(),
+		Message: message, Extra: extra, Status: status, CreatedAt: now, UpdatedAt: now,
+	}).Insert(); err != nil {
+		g.Log().Warningf(ctx, "写入用户行为日志失败 userId:%d action:%s err:%+v", user.Id, action, err)
 	}
 }
 

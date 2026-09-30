@@ -359,6 +359,8 @@ func (s *sApiSite) Index(ctx context.Context, in sitein.IndexInp) (res *sitein.I
 
 	if basicConfig != nil {
 		siteMap["sitelogo"] = basicConfig.Logo
+		siteMap["siteFavicon"] = basicConfig.Favicon
+		siteMap["siteDomain"] = basicConfig.Domain
 		siteMap["siteSystemOpen"] = basicConfig.SystemOpen
 		siteMap["siteCloseText"] = basicConfig.CloseText
 	}
@@ -370,6 +372,7 @@ func (s *sApiSite) Index(ctx context.Context, in sitein.IndexInp) (res *sitein.I
 		siteMap["siteDescription"] = siteConfig.SiteDescription
 		siteMap["siteCopyRight"] = siteConfig.SiteCopyRight
 		siteMap["siteIcp"] = siteConfig.SiteIcp
+		siteMap["sitePoliceRecord"] = siteConfig.PoliceRecord
 		siteMap["siteemail"] = siteConfig.Email
 		siteMap["sitephone"] = siteConfig.Phone
 		siteMap["sitewechatQrCode"] = siteConfig.WechatQrCode

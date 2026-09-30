@@ -18,6 +18,7 @@
       @finish="finish"
       name="file"
       :max="maxUpload"
+      :accept="accept"
       :default-file-list="fileList"
       list-type="image"
     >
@@ -49,6 +50,7 @@
     maxUpload?: number;
     finishCall?: Function | null;
     uploadType?: FileType;
+    accept?: string;
   }
 
   const props = withDefaults(defineProps<Props>(), {
@@ -56,6 +58,7 @@
     maxUpload: 20,
     finishCall: null,
     uploadType: 'default',
+    accept: undefined,
   });
 
   const fileList = ref<UploadFileInfo[]>([]);

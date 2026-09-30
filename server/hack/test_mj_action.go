@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 )
 
 func main() {
-	apiKey := "sk-S1rEFxwonvQR3wTx6d7d8a32C3E74c4389F1AeC7Fe7a1786"
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		panic("OPENAI_API_KEY is required")
+	}
 	taskId := "1784915543848681" // 前面成功的 MJ 任务 ID
 
 	testCases := []struct {

@@ -171,7 +171,7 @@
   </div>
 </template>
 <script lang="ts" setup>
-  import { Edit, View } from '@/api/userRule';
+  import { Edit, View } from '@/api/user/userRule';
   import { State, newState, rules } from './model';
   import { useProjectSettingStore } from '@/store/modules/projectSetting';
   import { useMessage } from 'naive-ui';

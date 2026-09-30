@@ -8,12 +8,9 @@ package userin
 
 import (
 	"context"
-	"hotgo/internal/consts"
 	"hotgo/internal/model/entity"
 	"hotgo/internal/model/input/form"
-	"hotgo/utility/validate"
 
-	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 )
 
@@ -198,29 +195,3 @@ type UserRuleExportModel struct {
 	UpdateTime   int64  `json:"updateTime"   dc:"更新时间"`
 	CreateTime   int64  `json:"createTime"   dc:"创建时间"`
 }
-
-// UserRuleStatusInp 更新规则管理状态
-type UserRuleStatusInp struct {
-	Id     int `json:"id" v:"required#ID不能为空" dc:"ID"`
-	Status int `json:"status" dc:"状态"`
-}
-
-func (in *UserRuleStatusInp) Filter(ctx context.Context) (err error) {
-	if in.Id <= 0 {
-		err = gerror.New("ID不能为空")
-		return
-	}
-
-	if in.Status <= 0 {
-		err = gerror.New("状态不能为空")
-		return
-	}
-
-	if !validate.InSlice(consts.StatusSlice, in.Status) {
-		err = gerror.New("状态不正确")
-		return
-	}
-	return
-}
-
-type UserRuleStatusModel struct{}

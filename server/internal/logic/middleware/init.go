@@ -108,6 +108,7 @@ func getModule(path string) (module string) {
 // CORS allows Cross-origin resource sharing.
 func (s *sMiddleware) CORS(r *ghttp.Request) {
 	r.Response.CORSDefault()
+	r.Response.Header().Set("Access-Control-Expose-Headers", "X-Token-Expire-At")
 	r.Middleware.Next()
 }
 

@@ -81,21 +81,23 @@ func ImportSql(ctx context.Context, path string) error {
 	}
 	sqlContent := string(rows)
 	config := g.DB("default").GetConfig()
-	if config.Type == consts.DBPgsql {
-		return importSqlPgsql(ctx, sqlContent)
-	}
-	return importSqlMysql(ctx, sqlContent)
+	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		if config.Type == consts.DBPgsql {
+			return importSqlPgsql(ctx, tx, sqlContent)
+		}
+		return importSqlMysql(ctx, tx, sqlContent)
+	})
 }
 
 // importSqlMysql 导出mysql文件
-func importSqlMysql(ctx context.Context, sqlContent string) error {
+func importSqlMysql(ctx context.Context, tx gdb.TX, sqlContent string) error {
 	sqlArr := strings.Split(sqlContent, "\n")
 	for _, sql := range sqlArr {
 		sql = strings.TrimSpace(sql)
 		if sql == "" || strings.HasPrefix(sql, "--") {
 			continue
 		}
-		exec, err := g.DB().Exec(ctx, sql)
+		exec, err := tx.Exec(sql)
 		g.Log().Infof(ctx, "views.ImportSql sql:%v, exec:%+v, err:%+v", sql, exec, err)
 		if err != nil {
 			return err
@@ -105,7 +107,7 @@ func importSqlMysql(ctx context.Context, sqlContent string) error {
 }
 
 // importSqlPgsql 导出pgsql文件
-func importSqlPgsql(ctx context.Context, sqlContent string) error {
+func importSqlPgsql(ctx context.Context, tx gdb.TX, sqlContent string) error {
 	lines := strings.Split(sqlContent, "\n")
 	var currentStmt strings.Builder
 	inDoBlock := false

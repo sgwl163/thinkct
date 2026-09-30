@@ -4,19 +4,19 @@ import { FormSchema } from '@/components/Form';
 export class State {
   public id = 0; // ID
   public pid = 0; // 上级菜单
-  public type = menu; // 类型:route=路由,menu_dir=菜单目录,menu=菜单项,nav_user_menu=顶栏会员菜单下拉项,nav=顶栏菜单项,button=页面按钮
+  public type = 'menu'; // 类型:route=路由,menu_dir=菜单目录,menu=菜单项,nav_user_menu=顶栏会员菜单下拉项,nav=顶栏菜单项,button=页面按钮
   public title = ''; // 标题
   public name = ''; // 规则名称
   public path = ''; // 路由路径
   public icon = ''; // 图标
-  public menuType = tab; // 菜单类型:tab=选项卡,link=链接,iframe=Iframe
+  public menuType = 'tab'; // 菜单类型:tab=选项卡,link=链接,iframe=Iframe
   public url = ''; // Url
   public component = ''; // 组件路径
   public noLoginValid = 0; // 未登录有效:0=否,1=是
-  public extend = none; // 扩展属性:none=无,add_rules_only=只添加为路由,add_menu_only=只添加为菜单
+  public extend = 'none'; // 扩展属性:none=无,add_rules_only=只添加为路由,add_menu_only=只添加为菜单
   public remark = ''; // 备注
   public weigh = 0; // 权重
-  public status = 1; // 状态:0=禁用,1=启用
+  public status = '1'; // 状态:0=禁用,1=启用
   public updateTime = 0; // 更新时间
   public createTime = 0; // 创建时间
 

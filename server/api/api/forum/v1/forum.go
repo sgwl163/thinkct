@@ -16,17 +16,17 @@ type Author struct {
 }
 
 type UserProfile struct {
-	Author         *Author `json:"author" dc:"作者信息"`
-	Motto          string  `json:"motto" dc:"个性签名"`
-	JoinTime       uint64  `json:"joinTime" dc:"加入时间"`
-	ArticleCount   uint    `json:"articleCount" dc:"已发布主题数"`
-	ViewCount      uint    `json:"viewCount" dc:"主题总阅读数"`
-	FollowingCount int     `json:"followingCount" dc:"关注数"`
-	FollowerCount  int     `json:"followerCount" dc:"粉丝数"`
-	FavoriteCount  int     `json:"favoriteCount" dc:"收藏主题数"`
-	LikeCount      int     `json:"likeCount" dc:"点赞主题数"`
-	IsFollowed     bool    `json:"isFollowed" dc:"当前用户是否已关注"`
-	IsSelf         bool    `json:"isSelf" dc:"是否为当前用户本人"`
+	Author         *Author     `json:"author" dc:"作者信息"`
+	Motto          string      `json:"motto" dc:"个性签名"`
+	JoinedAt       *gtime.Time `json:"joinedAt" dc:"加入时间"`
+	ArticleCount   uint        `json:"articleCount" dc:"已发布主题数"`
+	ViewCount      uint        `json:"viewCount" dc:"主题总阅读数"`
+	FollowingCount int         `json:"followingCount" dc:"关注数"`
+	FollowerCount  int         `json:"followerCount" dc:"粉丝数"`
+	FavoriteCount  int         `json:"favoriteCount" dc:"收藏主题数"`
+	LikeCount      int         `json:"likeCount" dc:"点赞主题数"`
+	IsFollowed     bool        `json:"isFollowed" dc:"当前用户是否已关注"`
+	IsSelf         bool        `json:"isSelf" dc:"是否为当前用户本人"`
 }
 
 type UserActivity struct {

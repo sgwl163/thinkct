@@ -11,7 +11,10 @@
         </n-form-item>
 
         <n-form-item label="站点关键词" path="siteKeywords">
-          <n-input v-model:value="formValue.siteKeywords" placeholder="请输入站点关键词(逗号分隔)" />
+          <n-input
+            v-model:value="formValue.siteKeywords"
+            placeholder="请输入站点关键词(逗号分隔)"
+          />
         </n-form-item>
 
         <n-form-item label="站点描述" path="siteDescription">
@@ -29,11 +32,15 @@
         <n-form-item label="ICP备案号" path="siteIcp">
           <n-input v-model:value="formValue.siteIcp" placeholder="请输入ICP备案号" />
         </n-form-item>
-        
+
+        <n-form-item label="公安备案号" path="sitePoliceRecord">
+          <n-input v-model:value="formValue.sitePoliceRecord" placeholder="请输入公安备案号" />
+        </n-form-item>
+
         <n-form-item label="邮箱地址" path="email">
           <n-input v-model:value="formValue.email" placeholder="请输入邮箱地址" />
         </n-form-item>
-        
+
         <n-form-item label="联系电话" path="phone">
           <n-input v-model:value="formValue.phone" placeholder="请输入联系电话" />
         </n-form-item>
@@ -74,6 +81,7 @@
     siteDescription: '',
     siteCopyRight: '',
     siteIcp: '',
+    sitePoliceRecord: '',
     email: '',
     phone: '',
     wechatQrCode: '',

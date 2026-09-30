@@ -24,6 +24,7 @@ import (
 	"hotgo/internal/model/input/sysin"
 	"hotgo/internal/service"
 	"sort"
+	"sync"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
@@ -32,6 +33,8 @@ import (
 
 //go:linkname doGenDaoForArray hotgo/internal/library/hggen/internal/cmd/gendao.doGenDaoForArray
 func doGenDaoForArray(ctx context.Context, index int, in gendao.CGenDaoInput)
+
+var buildMu sync.Mutex
 
 // Dao 生成数据库实体
 func Dao(ctx context.Context) (err error) {
@@ -252,6 +255,10 @@ func Preview(ctx context.Context, in *sysin.GenCodesPreviewInp) (res *sysin.GenC
 
 // Build 提交生成
 func Build(ctx context.Context, in *sysin.GenCodesBuildInp) (err error) {
+	// DAO、service 与目标文件目录由所有生成请求共享，必须串行生成。
+	buildMu.Lock()
+	defer buildMu.Unlock()
+
 	genConfig, err := service.SysConfig().GetLoadGenerate(ctx)
 	if err != nil {
 		return err

@@ -41,9 +41,15 @@ func init() {
 	service.RegisterSysGenCodes(NewSysGenCodes())
 }
 
-// Delete 删除
+// Delete 删除未生成的配置。已开始生成的记录必须通过 DeleteBuild 清理，防止遗留文件或菜单。
 func (s *sSysGenCodes) Delete(ctx context.Context, in *sysin.GenCodesDeleteInp) (err error) {
-	_, err = dao.SysGenCodes.Ctx(ctx).Where("id", in.Id).Delete()
+	_, err = dao.SysGenCodes.Ctx(ctx).
+		Where(dao.SysGenCodes.Columns().Id, in.Id).
+		Where(dao.SysGenCodes.Columns().Status, consts.GenCodesStatusWait).
+		Delete()
+	if err != nil {
+		return gerror.Wrap(err, "删除生成配置失败")
+	}
 	return
 }
 
@@ -57,8 +63,8 @@ func (s *sSysGenCodes) DeleteBuild(ctx context.Context, in *sysin.GenCodesDelete
 	if record.Id == 0 {
 		return gerror.New("生成配置不存在")
 	}
-	if record.Status != consts.GenCodesStatusOk {
-		return gerror.New("仅已生成成功的配置可以删除生成代码")
+	if record.Status != consts.GenCodesStatusOk && record.Status != consts.GenCodesStatusFail {
+		return gerror.New("仅生成成功或失败的配置可以删除生成代码")
 	}
 	if record.GenType != consts.GenCodesTypeCurd && record.GenType != consts.GenCodesTypeTree {
 		return gerror.New("该生成类型暂不支持删除生成代码")

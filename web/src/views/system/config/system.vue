@@ -29,6 +29,7 @@
           <PaySetting v-if="type === 10" />
           <WechatSetting v-if="type === 11" />
           <SiteSetting v-if="type === 12" />
+          <ModelSetting v-if="type === 13" />
         </n-card>
       </n-grid-item>
     </n-grid>
@@ -74,6 +75,9 @@
     }),
     LoginSetting = defineAsyncComponent(() => {
       return import('./LoginSetting.vue');
+    }),
+    ModelSetting = defineAsyncComponent(() => {
+      return import('./ModelSetting.vue');
     });
   const typeTabList = [
     {
@@ -136,6 +140,11 @@
       desc: '前端站点展示信息配置',
       key: 12,
     },
+    {
+      name: '模型配置',
+      desc: '配置 OpenAI 兼容模型服务',
+      key: 13,
+    },
   ];
   export default defineComponent({
     components: {
@@ -151,6 +160,7 @@
       WechatSetting,
       LoginSetting,
       SiteSetting,
+      ModelSetting,
     },
     setup() {
       const router = useRouter();

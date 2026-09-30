@@ -14,6 +14,7 @@ type BasicConfig struct {
 	Copyright      string `json:"basicCopyright"`
 	IcpCode        string `json:"basicIcpCode"`
 	Logo           string `json:"basicLogo"`
+	Favicon        string `json:"basicFavicon"`
 	Name           string `json:"basicName"`
 	Domain         string `json:"basicDomain"`
 	WsAddr         string `json:"basicWsAddr"`
@@ -29,6 +30,7 @@ type SiteConfig struct {
 	SiteDescription string `json:"siteDescription"`
 	SiteCopyRight   string `json:"siteCopyRight"`
 	SiteIcp         string `json:"siteIcp"`
+	PoliceRecord    string `json:"sitePoliceRecord"`
 	Email           string `json:"email"`
 	Phone           string `json:"phone"`
 	WechatQrCode    string `json:"wechatQrCode"`
@@ -114,6 +116,13 @@ type UploadConfig struct {
 // GeoConfig 地理配置
 type GeoConfig struct {
 	GeoAmapWebKey string `json:"geoAmapWebKey"`
+}
+
+// OpenaiConfig 模型配置
+type OpenaiConfig struct {
+	ApiKey       string `json:"openaiApiKey"`
+	BaseUrl      string `json:"openaiBaseUrl"`
+	DefaultModel string `json:"openaiDefaultModel"`
 }
 
 // SmsTemplate 短信模板

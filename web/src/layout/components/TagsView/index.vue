@@ -91,7 +91,7 @@
   import { useRoute, useRouter } from 'vue-router';
   import { storage } from '@/utils/Storage';
   import { TABS_ROUTES } from '@/store/mutation-types';
-  import { useTabsViewStore } from '@/store/modules/tabsView';
+  import { useTabsViewStore, isExcludedTabRoute } from '@/store/modules/tabsView';
   import { useAsyncRouteStore } from '@/store/modules/asyncRoute';
   import { RouteItem } from '@/store/modules/tabsView';
   import { useProjectSetting } from '@/hooks/setting/useProjectSetting';
@@ -241,6 +241,9 @@
         cacheRoutes = [simpleRoute];
       }
 
+      // 清理重定向路由历史缓存，避免刷新后将 RedirectSon 恢复为标签页
+      cacheRoutes = cacheRoutes.filter((cacheRoute) => !isExcludedTabRoute(cacheRoute));
+
       // 将最新的路由信息同步到 localStorage 中
       const routes = router.getRoutes();
       cacheRoutes.forEach((cacheRoute) => {
@@ -285,16 +288,11 @@
 
       // 标签页列表
       const tabsList: any = computed(() => tabsViewStore.tabsList);
-      const whiteList: string[] = [
-        PageEnum.BASE_LOGIN_NAME,
-        PageEnum.REDIRECT_NAME,
-        PageEnum.ERROR_PAGE_NAME,
-      ];
 
       watch(
         () => route.fullPath,
         (to) => {
-          if (whiteList.includes(route.name as string)) return;
+          if (isExcludedTabRoute(route)) return;
           state.activeKey = to;
           tabsViewStore.addTabs(getSimpleRoute(route));
           updateNavScroll(true);

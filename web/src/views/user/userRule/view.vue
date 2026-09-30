@@ -108,7 +108,7 @@
 </template>
 <script lang="ts" setup>
   import { useMessage } from 'naive-ui';
-  import { View } from '@/api/userRule';
+  import { View } from '@/api/user/userRule';
   import { State, newState } from './model';
   import { adaModalWidth } from '@/utils/hotgo';
 

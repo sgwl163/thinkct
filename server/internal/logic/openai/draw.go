@@ -87,8 +87,11 @@ func (s *sOpenai) doDrawTask(ctx context.Context, taskId int64) {
 		return
 	}
 
-	apiKey := g.Cfg().MustGet(ctx, "openai.apiKey").String()
-	baseUrl := g.Cfg().MustGet(ctx, "openai.baseUrl").String()
+	apiKey, baseUrl, err := getModelConfig(ctx)
+	if err != nil {
+		s.markDrawFailed(ctx, taskId, "读取模型配置失败: "+err.Error())
+		return
+	}
 
 	if apiKey == "" || baseUrl == "" {
 		s.markDrawFailed(ctx, taskId, "绘画配置不完整(apiKey or baseUrl)")
@@ -395,8 +398,11 @@ func (s *sOpenai) DrawAction(ctx context.Context, req *v1.DrawTaskActionReq) (re
 }
 
 func (s *sOpenai) doMidjourneyActionTask(ctx context.Context, newTaskId int64, mjTaskId string, action string, buttonsJson string) {
-	apiKey := g.Cfg().MustGet(ctx, "openai.apiKey").String()
-	baseUrl := g.Cfg().MustGet(ctx, "openai.baseUrl").String()
+	apiKey, baseUrl, err := getModelConfig(ctx)
+	if err != nil {
+		s.markDrawFailed(ctx, newTaskId, "读取模型配置失败: "+err.Error())
+		return
+	}
 
 	if apiKey == "" || baseUrl == "" {
 		s.markDrawFailed(ctx, newTaskId, "绘画配置不完整(apiKey or baseUrl)")
@@ -543,8 +549,10 @@ func (s *sOpenai) DrawPromptTranslate(ctx context.Context, req *v1.DrawPromptTra
 		return nil, gerror.New("请先登录")
 	}
 
-	apiKey := g.Cfg().MustGet(ctx, "openai.apiKey").String()
-	baseUrl := g.Cfg().MustGet(ctx, "openai.baseUrl").String()
+	apiKey, baseUrl, err := getModelConfig(ctx)
+	if err != nil {
+		return nil, gerror.Wrap(err, "读取模型配置失败")
+	}
 
 	client := hgopenai.NewClient(apiKey)
 	if baseUrl != "" {
@@ -580,8 +588,10 @@ func (s *sOpenai) DrawPromptEnrich(ctx context.Context, req *v1.DrawPromptEnrich
 		return nil, gerror.New("请先登录")
 	}
 
-	apiKey := g.Cfg().MustGet(ctx, "openai.apiKey").String()
-	baseUrl := g.Cfg().MustGet(ctx, "openai.baseUrl").String()
+	apiKey, baseUrl, err := getModelConfig(ctx)
+	if err != nil {
+		return nil, gerror.Wrap(err, "读取模型配置失败")
+	}
 
 	client := hgopenai.NewClient(apiKey)
 	if baseUrl != "" {
@@ -800,7 +810,7 @@ func (s *sOpenai) DrawSquare(ctx context.Context, req *v1.DrawSquareListReq) (re
 
 	// 广场只展示成功的作品
 	m := dao.OpenaiDrawTask.Ctx(ctx).Where(dao.OpenaiDrawTask.Columns().Status, 1)
-	
+
 	total, err := m.Count()
 	if err != nil {
 		return nil, err

@@ -81,7 +81,7 @@
   import { BasicTable, TableAction } from '@/components/Table';
   import { BasicForm, useForm } from '@/components/Form/index';
   import { usePermission } from '@/hooks/web/usePermission';
-  import { List, Export, Delete, Status } from '@/api/userRule';
+  import { List, Export, Delete } from '@/api/user/userRule';
   import { PlusOutlined, ExportOutlined, DeleteOutlined } from '@vicons/antd';
   import { columns, schemas, State } from './model';
   import { adaTableScrollX } from '@/utils/hotgo';
@@ -98,7 +98,7 @@
   const checkedIds = ref([]);
 
   const actionColumn = reactive({
-    width: 288,
+    width: 216,
     title: '操作',
     key: 'action',
     fixed: 'right',
@@ -112,22 +112,6 @@
             auth: ['/userRule/edit'],
           },
 
-          {
-            label: '禁用',
-            onClick: handleStatus.bind(null, record, 2),
-            ifShow: () => {
-              return record.status === 1;
-            },
-            auth: ['/userRule/status'],
-          },
-          {
-            label: '启用',
-            onClick: handleStatus.bind(null, record, 1),
-            ifShow: () => {
-              return record.status === 2;
-            },
-            auth: ['/userRule/status'],
-          },
           {
             label: '删除',
             onClick: handleDelete.bind(null, record),
@@ -232,16 +216,6 @@
   function handleExport() {
     message.loading('正在导出列表...', { duration: 1200 });
     Export(searchFormRef.value?.formModel);
-  }
-
-  // 修改状态
-  function handleStatus(record: Recordable, status: number) {
-    Status({ id: record.id, status: status }).then((_res) => {
-      message.success('设为' + dict.getLabel('sys_normal_disable', status) + '成功');
-      setTimeout(() => {
-        reloadTable();
-      });
-    });
   }
 
 </script>

@@ -33,6 +33,25 @@ func init() {
 	service.RegisterOpenai(NewOpenai())
 }
 
+func getModelConfig(ctx context.Context) (apiKey, baseURL string, err error) {
+	conf, err := service.SysConfig().GetOpenai(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	if conf == nil || strings.TrimSpace(conf.ApiKey) == "" || strings.TrimSpace(conf.BaseUrl) == "" {
+		return "", "", gerror.New("模型配置不完整，请在系统配置的模型配置中填写 API Key 和接口地址")
+	}
+	return strings.TrimSpace(conf.ApiKey), strings.TrimRight(strings.TrimSpace(conf.BaseUrl), "/"), nil
+}
+
+func getDefaultModel(ctx context.Context) string {
+	conf, err := service.SysConfig().GetOpenai(ctx)
+	if err == nil && conf != nil && strings.TrimSpace(conf.DefaultModel) != "" {
+		return strings.TrimSpace(conf.DefaultModel)
+	}
+	return "gpt-3.5-turbo"
+}
+
 func urlToBase64DataURI(ctx context.Context, imgUrl string) string {
 	if strings.HasPrefix(imgUrl, "data:image") {
 		return imgUrl
@@ -448,18 +467,11 @@ func (s *sOpenai) MessageSend(ctx context.Context, req *v1.MessageSendReq) (res 
 		// 查询数据库中的模型和对应分组信息
 		modelName := session.Model
 		if modelName == "" {
-			modelName = "gpt-3.5-turbo"
+			modelName = getDefaultModel(ctx)
 		}
 		var titleApiKey, titleBaseUrl string
-		var apiModel *entity.OpenaiApiModel
-		_ = dao.OpenaiApiModel.Ctx(ctx).Where(dao.OpenaiApiModel.Columns().Model, modelName).Scan(&apiModel)
-		if apiModel != nil {
-			var apiGroup *entity.OpenaiApiGroup
-			_ = dao.OpenaiApiGroup.Ctx(ctx).WherePri(apiModel.GroupId).Scan(&apiGroup)
-			if apiGroup != nil {
-				titleApiKey = apiGroup.ApiKey
-				titleBaseUrl = apiGroup.BaseUrl
-			}
+		if titleApiKey, titleBaseUrl, err = getModelConfig(ctx); err != nil {
+			g.Log().Warningf(ctx, "读取标题生成模型配置失败: %v", err)
 		}
 
 		if titleApiKey != "" {
@@ -563,30 +575,12 @@ func (s *sOpenai) MessageSend(ctx context.Context, req *v1.MessageSendReq) (res 
 	// =========================================================================
 	modelName := session.Model
 	if modelName == "" {
-		modelName = "gpt-3.5-turbo"
+		modelName = getDefaultModel(ctx)
 	}
 
-	apiKey := ""
-	baseUrl := ""
-
-	// 从数据库读取动态配置
-	var apiModel *entity.OpenaiApiModel
-	_ = dao.OpenaiApiModel.Ctx(ctx).Where(dao.OpenaiApiModel.Columns().Model, modelName).Scan(&apiModel)
-	if apiModel != nil {
-		var apiGroup *entity.OpenaiApiGroup
-		_ = dao.OpenaiApiGroup.Ctx(ctx).WherePri(apiModel.GroupId).Scan(&apiGroup)
-		if apiGroup != nil {
-			apiKey = apiGroup.ApiKey
-			baseUrl = apiGroup.BaseUrl
-		}
-	}
-
-	// 兜底使用 config.yaml 全局配置
-	if apiKey == "" {
-		apiKey = g.Cfg().MustGet(ctx, "openai.apiKey").String()
-	}
-	if baseUrl == "" {
-		baseUrl = g.Cfg().MustGet(ctx, "openai.baseUrl").String()
+	apiKey, baseUrl, err := getModelConfig(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	client := hgopenai.NewClient(apiKey)
@@ -838,28 +832,12 @@ func (s *sOpenai) MessageRegenerate(ctx context.Context, req *v1.MessageRegenera
 	// =========================================================================
 	modelName := session.Model
 	if modelName == "" {
-		modelName = "gpt-3.5-turbo"
+		modelName = getDefaultModel(ctx)
 	}
 
-	apiKey := ""
-	baseUrl := ""
-
-	var apiModel *entity.OpenaiApiModel
-	_ = dao.OpenaiApiModel.Ctx(ctx).Where(dao.OpenaiApiModel.Columns().Model, modelName).Scan(&apiModel)
-	if apiModel != nil {
-		var apiGroup *entity.OpenaiApiGroup
-		_ = dao.OpenaiApiGroup.Ctx(ctx).WherePri(apiModel.GroupId).Scan(&apiGroup)
-		if apiGroup != nil {
-			apiKey = apiGroup.ApiKey
-			baseUrl = apiGroup.BaseUrl
-		}
-	}
-
-	if apiKey == "" {
-		apiKey = g.Cfg().MustGet(ctx, "openai.apiKey").String()
-	}
-	if baseUrl == "" {
-		baseUrl = g.Cfg().MustGet(ctx, "openai.baseUrl").String()
+	apiKey, baseUrl, err := getModelConfig(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	client := hgopenai.NewClient(apiKey)

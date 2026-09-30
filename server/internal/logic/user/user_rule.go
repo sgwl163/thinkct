@@ -24,23 +24,23 @@ import (
 	"github.com/gogf/gf/v2/util/gconv"
 )
 
-type sUserRule struct{}
+type sUserUserRule struct{}
 
-func NewUserRule() *sUserRule {
-	return &sUserRule{}
+func NewUserUserRule() *sUserUserRule {
+	return &sUserUserRule{}
 }
 
 func init() {
-	service.RegisterUserRule(NewUserRule())
+	service.RegisterUserUserRule(NewUserUserRule())
 }
 
 // Model 规则管理ORM模型
-func (s *sUserRule) Model(ctx context.Context, option ...*handler.Option) *gdb.Model {
+func (s *sUserUserRule) Model(ctx context.Context, option ...*handler.Option) *gdb.Model {
 	return handler.Model(dao.UserRule.Ctx(ctx), option...)
 }
 
 // List 获取规则管理列表
-func (s *sUserRule) List(ctx context.Context, in *userin.UserRuleListInp) (list []*userin.UserRuleListModel, totalCount int, err error) {
+func (s *sUserUserRule) List(ctx context.Context, in *userin.UserRuleListInp) (list []*userin.UserRuleListModel, totalCount int, err error) {
 	mod := s.Model(ctx)
 
 	// 字段过滤
@@ -66,7 +66,7 @@ func (s *sUserRule) List(ctx context.Context, in *userin.UserRuleListInp) (list 
 }
 
 // Export 导出规则管理
-func (s *sUserRule) Export(ctx context.Context, in *userin.UserRuleListInp) (err error) {
+func (s *sUserUserRule) Export(ctx context.Context, in *userin.UserRuleListInp) (err error) {
 	list, totalCount, err := s.List(ctx, in)
 	if err != nil {
 		return
@@ -93,7 +93,7 @@ func (s *sUserRule) Export(ctx context.Context, in *userin.UserRuleListInp) (err
 }
 
 // Edit 修改/新增规则管理
-func (s *sUserRule) Edit(ctx context.Context, in *userin.UserRuleEditInp) (err error) {
+func (s *sUserUserRule) Edit(ctx context.Context, in *userin.UserRuleEditInp) (err error) {
 	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) (err error) {
 
 		// 修改
@@ -117,7 +117,7 @@ func (s *sUserRule) Edit(ctx context.Context, in *userin.UserRuleEditInp) (err e
 }
 
 // Delete 删除规则管理
-func (s *sUserRule) Delete(ctx context.Context, in *userin.UserRuleDeleteInp) (err error) {
+func (s *sUserUserRule) Delete(ctx context.Context, in *userin.UserRuleDeleteInp) (err error) {
 
 	if _, err = s.Model(ctx).WherePri(in.Id).Unscoped().Delete(); err != nil {
 		err = gerror.Wrap(err, "删除规则管理失败，请稍后重试！")
@@ -127,20 +127,9 @@ func (s *sUserRule) Delete(ctx context.Context, in *userin.UserRuleDeleteInp) (e
 }
 
 // View 获取规则管理指定信息
-func (s *sUserRule) View(ctx context.Context, in *userin.UserRuleViewInp) (res *userin.UserRuleViewModel, err error) {
+func (s *sUserUserRule) View(ctx context.Context, in *userin.UserRuleViewInp) (res *userin.UserRuleViewModel, err error) {
 	if err = s.Model(ctx).WherePri(in.Id).Scan(&res); err != nil {
 		err = gerror.Wrap(err, "获取规则管理信息，请稍后重试！")
-		return
-	}
-	return
-}
-
-// Status 更新规则管理状态
-func (s *sUserRule) Status(ctx context.Context, in *userin.UserRuleStatusInp) (err error) {
-	if _, err = s.Model(ctx).WherePri(in.Id).Data(g.Map{
-		dao.UserRule.Columns().Status: in.Status,
-	}).Update(); err != nil {
-		err = gerror.Wrap(err, "更新规则管理状态失败，请稍后重试！")
 		return
 	}
 	return

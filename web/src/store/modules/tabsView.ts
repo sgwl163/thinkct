@@ -2,7 +2,16 @@ import { defineStore } from 'pinia';
 import { RouteLocationNormalized } from 'vue-router';
 
 // 不需要出现在标签页中的路由
-const whiteList = ['Redirect', 'login'];
+const whiteList = ['Redirect', 'login', 'ErrorPage'];
+const redirectPath = '/redirect';
+
+export function isExcludedTabRoute(route: Partial<RouteLocationNormalized>): boolean {
+  return Boolean(
+    whiteList.includes(route.name as string) ||
+      route.path === redirectPath ||
+      route.path?.startsWith(`${redirectPath}/`)
+  );
+}
 
 export type RouteItem = Partial<RouteLocationNormalized> & {
   fullPath: string;
@@ -38,7 +47,7 @@ export const useTabsViewStore = defineStore({
     },
     addTabs(route): boolean {
       // 添加标签页
-      if (whiteList.includes(route.name)) return false;
+      if (isExcludedTabRoute(route)) return false;
       const isExists = this.tabsList.some((item) => item.fullPath == route.fullPath);
       if (!isExists) {
         this.tabsList.push(route);

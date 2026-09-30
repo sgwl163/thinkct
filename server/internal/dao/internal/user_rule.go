@@ -36,8 +36,8 @@ type UserRuleColumns struct {
 	Remark       string // 备注
 	Weigh        string // 权重
 	Status       string // 状态:0=禁用,1=启用
-	UpdateTime   string // 更新时间
-	CreateTime   string // 创建时间
+	CreatedAt    string // 更新时间
+	UpdatedAt    string // 创建时间
 }
 
 // userRuleColumns holds the columns for the table hg_user_rule.
@@ -57,8 +57,8 @@ var userRuleColumns = UserRuleColumns{
 	Remark:       "remark",
 	Weigh:        "weigh",
 	Status:       "status",
-	UpdateTime:   "update_time",
-	CreateTime:   "create_time",
+	CreatedAt:    "created_at",
+	UpdatedAt:    "updated_at",
 }
 
 // NewUserRuleDao creates and returns a new DAO object for table data access.

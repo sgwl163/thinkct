@@ -18,44 +18,43 @@ import (
 
 // UserUpdateFields 修改会员管理字段过滤
 type UserUpdateFields struct {
-	GroupId    int         `json:"groupId"    dc:"分组ID"`
-	Username   string      `json:"username"   dc:"用户名"`
-	Nickname   string      `json:"nickname"   dc:"昵称"`
-	Email      string      `json:"email"      dc:"邮箱"`
-	Mobile     string      `json:"mobile"     dc:"手机"`
-	Avatar     string      `json:"avatar"     dc:"头像"`
-	Gender     int         `json:"gender"     dc:"性别:0=未知,1=男,2=女"`
-	Birthday   *gtime.Time `json:"birthday"   dc:"生日"`
-	Money      int         `json:"money"      dc:"余额"`
-	Score      int         `json:"score"      dc:"积分"`
-	JoinTime   int64       `json:"joinTime"   dc:"加入时间"`
-	Motto      string      `json:"motto"      dc:"签名"`
-	Status     string      `json:"status"     dc:"状态:enable=启用,disable=禁用"`
-	CreateTime int64       `json:"createTime" dc:"创建时间"`
-	UpdateTime int64       `json:"updateTime" dc:"更新时间"`
-	Password   string      `json:"password"   dc:"密码"`
-	Salt       string      `json:"salt"       dc:"密码盐"`
+	GroupId   int         `json:"groupId"    dc:"分组ID"`
+	Username  string      `json:"username"   dc:"用户名"`
+	Nickname  string      `json:"nickname"   dc:"昵称"`
+	Email     string      `json:"email"      dc:"邮箱"`
+	Mobile    string      `json:"mobile"     dc:"手机"`
+	Avatar    string      `json:"avatar"     dc:"头像"`
+	Gender    int         `json:"gender"     dc:"性别:0=未知,1=男,2=女"`
+	Birthday  *gtime.Time `json:"birthday"   dc:"生日"`
+	Money     int         `json:"money"      dc:"余额"`
+	Score     int         `json:"score"      dc:"积分"`
+	JoinedAt  *gtime.Time `json:"joinedAt"   dc:"加入时间"`
+	Motto     string      `json:"motto"      dc:"签名"`
+	Status    string      `json:"status"     dc:"状态:enable=启用,disable=禁用"`
+	UpdatedAt *gtime.Time `json:"updatedAt"  dc:"更新时间"`
+	Password  string      `json:"password"   dc:"密码"`
+	Salt      string      `json:"salt"       dc:"密码盐"`
 }
 
 // UserInsertFields 新增会员管理字段过滤
 type UserInsertFields struct {
-	GroupId    int         `json:"groupId"    dc:"分组ID"`
-	Username   string      `json:"username"   dc:"用户名"`
-	Nickname   string      `json:"nickname"   dc:"昵称"`
-	Email      string      `json:"email"      dc:"邮箱"`
-	Mobile     string      `json:"mobile"     dc:"手机"`
-	Avatar     string      `json:"avatar"     dc:"头像"`
-	Gender     int         `json:"gender"     dc:"性别:0=未知,1=男,2=女"`
-	Birthday   *gtime.Time `json:"birthday"   dc:"生日"`
-	Money      int         `json:"money"      dc:"余额"`
-	Score      int         `json:"score"      dc:"积分"`
-	JoinTime   int64       `json:"joinTime"   dc:"加入时间"`
-	Motto      string      `json:"motto"      dc:"签名"`
-	Status     string      `json:"status"     dc:"状态:enable=启用,disable=禁用"`
-	CreateTime int64       `json:"createTime" dc:"创建时间"`
-	UpdateTime int64       `json:"updateTime" dc:"更新时间"`
-	Password   string      `json:"password"   dc:"密码"`
-	Salt       string      `json:"salt"       dc:"密码盐"`
+	GroupId   int         `json:"groupId"    dc:"分组ID"`
+	Username  string      `json:"username"   dc:"用户名"`
+	Nickname  string      `json:"nickname"   dc:"昵称"`
+	Email     string      `json:"email"      dc:"邮箱"`
+	Mobile    string      `json:"mobile"     dc:"手机"`
+	Avatar    string      `json:"avatar"     dc:"头像"`
+	Gender    int         `json:"gender"     dc:"性别:0=未知,1=男,2=女"`
+	Birthday  *gtime.Time `json:"birthday"   dc:"生日"`
+	Money     int         `json:"money"      dc:"余额"`
+	Score     int         `json:"score"      dc:"积分"`
+	JoinedAt  *gtime.Time `json:"joinedAt"  dc:"加入时间"`
+	Motto     string      `json:"motto"     dc:"签名"`
+	Status    string      `json:"status"    dc:"状态:enable=启用,disable=禁用"`
+	CreatedAt *gtime.Time `json:"createdAt" dc:"创建时间"`
+	UpdatedAt *gtime.Time `json:"updatedAt" dc:"更新时间"`
+	Password  string      `json:"password"   dc:"密码"`
+	Salt      string      `json:"salt"       dc:"密码盐"`
 }
 
 // UserEditInp 修改/新增会员管理
@@ -136,47 +135,49 @@ func (in *UserListInp) Filter(ctx context.Context) (err error) {
 }
 
 type UserListModel struct {
-	Id            int         `json:"id"            dc:"ID"`
-	GroupId       int         `json:"groupId"       dc:"分组ID"`
-	Username      string      `json:"username"      dc:"用户名"`
-	Nickname      string      `json:"nickname"      dc:"昵称"`
-	Email         string      `json:"email"         dc:"邮箱"`
-	Mobile        string      `json:"mobile"        dc:"手机"`
-	Avatar        string      `json:"avatar"        dc:"头像"`
-	Gender        int         `json:"gender"        dc:"性别:0=未知,1=男,2=女"`
-	Birthday      *gtime.Time `json:"birthday"      dc:"生日"`
-	Money         int         `json:"money"         dc:"余额"`
-	Score         int         `json:"score"         dc:"积分"`
-	LastLoginTime int64       `json:"lastLoginTime" dc:"上次登录时间"`
-	LastLoginIp   string      `json:"lastLoginIp"   dc:"上次登录IP"`
-	LoginFailure  int         `json:"loginFailure"  dc:"登录失败次数"`
-	JoinIp        string      `json:"joinIp"        dc:"加入IP"`
-	JoinTime      int64       `json:"joinTime"      dc:"加入时间"`
-	Status        string      `json:"status"        dc:"状态:enable=启用,disable=禁用"`
-	CreateTime    int64       `json:"createTime"    dc:"创建时间"`
+	Id           int         `json:"id"           dc:"ID"`
+	GroupId      int         `json:"groupId"      dc:"分组ID"`
+	Username     string      `json:"username"     dc:"用户名"`
+	Nickname     string      `json:"nickname"     dc:"昵称"`
+	Email        string      `json:"email"        dc:"邮箱"`
+	Mobile       string      `json:"mobile"       dc:"手机"`
+	Avatar       string      `json:"avatar"       dc:"头像"`
+	Gender       int         `json:"gender"       dc:"性别:0=未知,1=男,2=女"`
+	Birthday     *gtime.Time `json:"birthday"     dc:"生日"`
+	Money        int         `json:"money"        dc:"余额"`
+	Score        int         `json:"score"        dc:"积分"`
+	LastLoginAt  *gtime.Time `json:"lastLoginAt"  dc:"上次登录时间"`
+	LastLoginIp  string      `json:"lastLoginIp"  dc:"上次登录IP"`
+	LoginFailure int         `json:"loginFailure" dc:"登录失败次数"`
+	JoinIp       string      `json:"joinIp"       dc:"加入IP"`
+	JoinedAt     *gtime.Time `json:"joinedAt"     dc:"加入时间"`
+	Status       string      `json:"status"       dc:"状态:enable=启用,disable=禁用"`
+	CreatedAt    *gtime.Time `json:"createdAt"    dc:"创建时间"`
+	UpdatedAt    *gtime.Time `json:"updatedAt"    dc:"更新时间"`
 }
 
 // UserExportModel 导出会员管理
 type UserExportModel struct {
-	Id            int         `json:"id"            dc:"ID"`
-	GroupId       int         `json:"groupId"       dc:"分组ID"`
-	Username      string      `json:"username"      dc:"用户名"`
-	Nickname      string      `json:"nickname"      dc:"昵称"`
-	Email         string      `json:"email"         dc:"邮箱"`
-	Mobile        string      `json:"mobile"        dc:"手机"`
-	Avatar        string      `json:"avatar"        dc:"头像"`
-	Gender        int         `json:"gender"        dc:"性别:0=未知,1=男,2=女"`
-	Birthday      *gtime.Time `json:"birthday"      dc:"生日"`
-	Money         int         `json:"money"         dc:"余额"`
-	Score         int         `json:"score"         dc:"积分"`
-	LastLoginTime int64       `json:"lastLoginTime" dc:"上次登录时间"`
-	LastLoginIp   string      `json:"lastLoginIp"   dc:"上次登录IP"`
-	LoginFailure  int         `json:"loginFailure"  dc:"登录失败次数"`
-	JoinIp        string      `json:"joinIp"        dc:"加入IP"`
-	JoinTime      int64       `json:"joinTime"      dc:"加入时间"`
-	Motto         string      `json:"motto"         dc:"签名"`
-	Status        string      `json:"status"        dc:"状态:enable=启用,disable=禁用"`
-	CreateTime    int64       `json:"createTime"    dc:"创建时间"`
+	Id           int         `json:"id"           dc:"ID"`
+	GroupId      int         `json:"groupId"      dc:"分组ID"`
+	Username     string      `json:"username"     dc:"用户名"`
+	Nickname     string      `json:"nickname"     dc:"昵称"`
+	Email        string      `json:"email"        dc:"邮箱"`
+	Mobile       string      `json:"mobile"       dc:"手机"`
+	Avatar       string      `json:"avatar"       dc:"头像"`
+	Gender       int         `json:"gender"       dc:"性别:0=未知,1=男,2=女"`
+	Birthday     *gtime.Time `json:"birthday"     dc:"生日"`
+	Money        int         `json:"money"        dc:"余额"`
+	Score        int         `json:"score"        dc:"积分"`
+	LastLoginAt  *gtime.Time `json:"lastLoginAt"  dc:"上次登录时间"`
+	LastLoginIp  string      `json:"lastLoginIp"  dc:"上次登录IP"`
+	LoginFailure int         `json:"loginFailure" dc:"登录失败次数"`
+	JoinIp       string      `json:"joinIp"       dc:"加入IP"`
+	JoinedAt     *gtime.Time `json:"joinedAt"     dc:"加入时间"`
+	Motto        string      `json:"motto"        dc:"签名"`
+	Status       string      `json:"status"       dc:"状态:enable=启用,disable=禁用"`
+	CreatedAt    *gtime.Time `json:"createdAt"    dc:"创建时间"`
+	UpdatedAt    *gtime.Time `json:"updatedAt"    dc:"更新时间"`
 }
 
 // UserStatusInp 更新会员管理状态

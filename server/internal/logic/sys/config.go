@@ -27,6 +27,7 @@ import (
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
+	"github.com/gogf/gf/v2/text/gstr"
 	"github.com/gogf/gf/v2/util/gconv"
 )
 
@@ -49,6 +50,13 @@ func (s *sSysConfig) InitConfig(ctx context.Context) {
 
 // LoadConfig 加载系统配置
 func (s *sSysConfig) LoadConfig(ctx context.Context) (err error) {
+	if err = s.ensureBasic(ctx); err != nil {
+		return
+	}
+	if err = s.EnsureOpenai(ctx); err != nil {
+		return
+	}
+
 	wx, err := s.GetWechat(ctx)
 	if err != nil {
 		return
@@ -124,6 +132,97 @@ func (s *sSysConfig) GetSms(ctx context.Context) (conf *model.SmsConfig, err err
 	return
 }
 
+// GetOpenai 获取模型配置
+func (s *sSysConfig) GetOpenai(ctx context.Context) (conf *model.OpenaiConfig, err error) {
+	var models []*entity.SysConfig
+	cols := dao.SysConfig.Columns()
+	if err = dao.SysConfig.Ctx(ctx).
+		Fields(cols.Key, cols.Value, cols.Type).
+		Where(cols.Group, "openai").
+		Scan(&models); err != nil {
+		return nil, gerror.Wrap(err, "获取模型配置失败")
+	}
+
+	conf = new(model.OpenaiConfig)
+	for _, item := range models {
+		value := consts.ConvType(item.Value, item.Type)
+		switch item.Key {
+		case "openaiApiKey":
+			conf.ApiKey = gconv.String(value)
+		case "openaiBaseUrl":
+			conf.BaseUrl = gconv.String(value)
+		case "openaiDefaultModel":
+			conf.DefaultModel = gconv.String(value)
+		}
+	}
+	return conf, nil
+}
+
+// EnsureOpenai 初始化模型配置
+func (s *sSysConfig) EnsureOpenai(ctx context.Context) (err error) {
+	defaults := []struct {
+		key, name, value, tip string
+		sort                  int
+	}{
+		{"openaiApiKey", "API Key", "", "用于访问模型服务的密钥", 130},
+		{"openaiBaseUrl", "接口地址", "https://api.gpt.ge/v1", "OpenAI兼容接口地址", 131},
+		{"openaiDefaultModel", "默认模型", "gpt-3.5-turbo", "聊天会话未指定模型时使用", 132},
+	}
+
+	// 兼容已存在的模型接口组数据，只在系统配置项为空时迁移一次。
+	var legacyGroup *entity.OpenaiApiGroup
+	_ = dao.OpenaiApiGroup.Ctx(ctx).
+		Where(dao.OpenaiApiGroup.Columns().Status, consts.StatusEnabled).
+		Where(dao.OpenaiApiGroup.Columns().DeletedAt, nil).
+		OrderAsc(dao.OpenaiApiGroup.Columns().Sort).
+		Scan(&legacyGroup)
+	if legacyGroup != nil {
+		defaults[0].value = legacyGroup.ApiKey
+		if legacyGroup.BaseUrl != "" {
+			defaults[1].value = legacyGroup.BaseUrl
+		}
+	}
+
+	cols := dao.SysConfig.Columns()
+	var models []*entity.SysConfig
+	if err = dao.SysConfig.Ctx(ctx).Where(cols.Group, "openai").Scan(&models); err != nil {
+		return gerror.Wrap(err, "初始化模型配置失败")
+	}
+	for _, item := range defaults {
+		row := s.getConfigByKey(item.key, models)
+		if row != nil {
+			if row.Value == "" && item.value != "" {
+				_, err = dao.SysConfig.Ctx(ctx).WherePri(row.Id).Data(g.Map{
+					cols.Value:     item.value,
+					cols.UpdatedAt: gtime.Now(),
+				}).Update()
+				if err != nil {
+					return gerror.Wrap(err, "迁移模型配置失败")
+				}
+			}
+			continue
+		}
+		_, err = dao.SysConfig.Ctx(ctx).Data(g.Map{
+			cols.Group:        "openai",
+			cols.Name:         item.name,
+			cols.Type:         consts.ConfigTypeString,
+			cols.Key:          item.key,
+			cols.Value:        item.value,
+			cols.DefaultValue: item.value,
+			cols.Sort:         item.sort,
+			cols.Tip:          item.tip,
+			cols.IsDefault:    1,
+			cols.Status:       consts.StatusEnabled,
+			cols.CreatedAt:    gtime.Now(),
+			cols.UpdatedAt:    gtime.Now(),
+		}).Insert()
+		if err != nil {
+			return gerror.Wrap(err, "写入模型配置失败")
+		}
+	}
+	return
+}
+
 // GetGeo 获取地理配置
 func (s *sSysConfig) GetGeo(ctx context.Context) (conf *model.GeoConfig, err error) {
 	models, err := s.GetConfigByGroup(ctx, &sysin.GetConfigInp{Group: "geo"})
@@ -157,6 +256,99 @@ func (s *sSysConfig) GetSmtp(ctx context.Context) (conf *model.EmailConfig, err 
 	conf.Addr = fmt.Sprintf("%s:%d", conf.Host, conf.Port)
 
 	return
+}
+
+// ensureBasic 初始化基础配置
+func (s *sSysConfig) ensureBasic(ctx context.Context) (err error) {
+	const (
+		faviconKey    = "basicFavicon"
+		imageTypeKey  = "uploadImageType"
+		faviconSuffix = "ico"
+	)
+
+	cols := dao.SysConfig.Columns()
+	var models []*entity.SysConfig
+	if err = dao.SysConfig.Ctx(ctx).
+		Where(cols.Group, "basic").
+		Where(cols.Key, faviconKey).
+		Scan(&models); err != nil {
+		return gerror.Wrap(err, "检查网站图标配置失败")
+	}
+	if len(models) == 0 {
+		_, err = dao.SysConfig.Ctx(ctx).Data(g.Map{
+			cols.Group:        "basic",
+			cols.Name:         "网站图标",
+			cols.Type:         consts.ConfigTypeString,
+			cols.Key:          faviconKey,
+			cols.Value:        "",
+			cols.DefaultValue: "",
+			cols.Sort:         25,
+			cols.Tip:          "浏览器标签页图标，建议上传 .ico 格式文件",
+			cols.IsDefault:    1,
+			cols.Status:       consts.StatusEnabled,
+			cols.CreatedAt:    gtime.Now(),
+			cols.UpdatedAt:    gtime.Now(),
+		}).Insert()
+		if err != nil {
+			return gerror.Wrap(err, "初始化网站图标配置失败")
+		}
+	}
+
+	var uploadConfig *entity.SysConfig
+	if err = dao.SysConfig.Ctx(ctx).
+		Where(cols.Group, "upload").
+		Where(cols.Key, imageTypeKey).
+		Scan(&uploadConfig); err != nil {
+		return gerror.Wrap(err, "检查图片上传类型配置失败")
+	}
+	if uploadConfig == nil || gstr.InArray(gstr.SplitAndTrim(uploadConfig.Value, ","), faviconSuffix) {
+		return nil
+	}
+
+	_, err = dao.SysConfig.Ctx(ctx).WherePri(uploadConfig.Id).Data(g.Map{
+		cols.Value:     gstr.Trim(uploadConfig.Value, ",") + "," + faviconSuffix,
+		cols.UpdatedAt: gtime.Now(),
+	}).Update()
+	if err != nil {
+		return gerror.Wrap(err, "启用网站图标上传失败")
+	}
+	return nil
+}
+
+// ensureSite 初始化站点配置
+func (s *sSysConfig) ensureSite(ctx context.Context) (err error) {
+	const policeRecordKey = "sitePoliceRecord"
+
+	cols := dao.SysConfig.Columns()
+	var config *entity.SysConfig
+	if err = dao.SysConfig.Ctx(ctx).
+		Where(cols.Group, "site").
+		Where(cols.Key, policeRecordKey).
+		Scan(&config); err != nil {
+		return gerror.Wrap(err, "检查公安备案号配置失败")
+	}
+	if config != nil {
+		return nil
+	}
+
+	_, err = dao.SysConfig.Ctx(ctx).Data(g.Map{
+		cols.Group:        "site",
+		cols.Name:         "公安备案号",
+		cols.Type:         consts.ConfigTypeString,
+		cols.Key:          policeRecordKey,
+		cols.Value:        "",
+		cols.DefaultValue: "",
+		cols.Sort:         75,
+		cols.Tip:          "网站公安机关备案号",
+		cols.IsDefault:    1,
+		cols.Status:       consts.StatusEnabled,
+		cols.CreatedAt:    gtime.Now(),
+		cols.UpdatedAt:    gtime.Now(),
+	}).Insert()
+	if err != nil {
+		return gerror.Wrap(err, "初始化公安备案号配置失败")
+	}
+	return nil
 }
 
 // GetBasic 获取基础配置
@@ -215,6 +407,16 @@ func (s *sSysConfig) GetConfigByGroup(ctx context.Context, in *sysin.GetConfigIn
 		err = gerror.New("分组不能为空")
 		return
 	}
+	if in.Group == "basic" {
+		if err = s.ensureBasic(ctx); err != nil {
+			return
+		}
+	}
+	if in.Group == "site" {
+		if err = s.ensureSite(ctx); err != nil {
+			return
+		}
+	}
 
 	var models []*entity.SysConfig
 	cols := dao.SysConfig.Columns()
@@ -254,6 +456,16 @@ func (s *sSysConfig) UpdateConfigByGroup(ctx context.Context, in *sysin.UpdateCo
 		err = gerror.New("分组不能为空")
 		return
 	}
+	if in.Group == "basic" {
+		if err = s.ensureBasic(ctx); err != nil {
+			return
+		}
+	}
+	if in.Group == "site" {
+		if err = s.ensureSite(ctx); err != nil {
+			return
+		}
+	}
 	var (
 		mod    = dao.SysConfig.Ctx(ctx)
 		models []*entity.SysConfig
@@ -266,6 +478,10 @@ func (s *sSysConfig) UpdateConfigByGroup(ctx context.Context, in *sysin.UpdateCo
 	err = dao.SysConfig.Transaction(ctx, func(ctx context.Context, tx gdb.TX) (err error) {
 		for k, v := range in.List {
 			row := s.getConfigByKey(k, models)
+			// 演示环境敏感配置会以占位文本返回，保存时保留数据库中的真实值。
+			if gconv.String(v) == consts.DemoTips {
+				continue
+			}
 			// 新增
 			if row == nil {
 				err = gerror.Newf("暂不支持从前台添加变量，请先在数据库表[%v]中配置变量：%v", dao.SysConfig.Table(), k)

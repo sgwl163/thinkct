@@ -14,6 +14,7 @@ import (
 	"hotgo/internal/library/contexts"
 	"hotgo/internal/library/hgorm"
 	"hotgo/internal/library/hgorm/handler"
+	"hotgo/internal/library/token"
 	"hotgo/internal/model/entity"
 	"hotgo/internal/model/input/form"
 	"hotgo/internal/model/input/userin"
@@ -102,6 +103,13 @@ func (s *sUserUser) Export(ctx context.Context, in *userin.UserListInp) (err err
 
 // Edit 修改/新增会员管理
 func (s *sUserUser) Edit(ctx context.Context, in *userin.UserEditInp) (err error) {
+	revokeTokens := in.Id > 0 && in.Password != ""
+	defer func() {
+		if err == nil && revokeTokens {
+			err = token.RevokeAll(ctx, consts.AppApi, int64(in.Id))
+		}
+	}()
+
 	// 验证'Username'唯一
 	if err = hgorm.IsUnique(ctx, &dao.User, g.Map{dao.User.Columns().Username: in.Username}, "用户名已存在", in.Id); err != nil {
 		return
@@ -138,8 +146,11 @@ func (s *sUserUser) Edit(ctx context.Context, in *userin.UserEditInp) (err error
 			if before == nil {
 				return gerror.New("会员不存在")
 			}
+			if in.Status != "" && !isUserEnabled(&in.User) {
+				revokeTokens = true
+			}
 
-			in.UpdateTime = uint64(gtime.Now().Unix())
+			in.UpdatedAt = gtime.Now()
 			data := gconv.Map(in)
 			if in.Password == "" {
 				delete(data, dao.User.Columns().Password)
@@ -157,8 +168,10 @@ func (s *sUserUser) Edit(ctx context.Context, in *userin.UserEditInp) (err error
 		}
 
 		// 新增
-		in.CreateTime = uint64(gtime.Now().Unix())
-		in.UpdateTime = uint64(gtime.Now().Unix())
+		now := gtime.Now()
+		in.CreatedAt = now
+		in.UpdatedAt = now
+		in.JoinedAt = now
 		if _, err = s.Model(ctx, &handler.Option{FilterAuth: false}).
 			Fields(userin.UserInsertFields{}).
 			Data(in).OmitEmptyData().Insert(); err != nil {
@@ -213,12 +226,13 @@ func (s *sUserUser) writeCreditsLog(ctx context.Context, before *entity.User, in
 
 // Delete 删除会员管理
 func (s *sUserUser) Delete(ctx context.Context, in *userin.UserDeleteInp) (err error) {
-
 	if _, err = s.Model(ctx).WherePri(in.Id).Unscoped().Delete(); err != nil {
-		err = gerror.Wrap(err, "删除会员管理失败，请稍后重试！")
-		return
+		return gerror.Wrap(err, "删除会员管理失败，请稍后重试！")
 	}
-	return
+	if err = token.RevokeAll(ctx, consts.AppApi, gconv.Int64(in.Id)); err != nil {
+		return gerror.Wrap(err, "会员已删除，但注销已有登录状态失败")
+	}
+	return nil
 }
 
 // View 获取会员管理指定信息
@@ -238,7 +252,12 @@ func (s *sUserUser) Status(ctx context.Context, in *userin.UserStatusInp) (err e
 		err = gerror.Wrap(err, "更新会员管理状态失败，请稍后重试！")
 		return
 	}
-	return
+	if !isUserEnabled(&entity.User{Status: in.Status}) {
+		if err = token.RevokeAll(ctx, consts.AppApi, int64(in.Id)); err != nil {
+			return gerror.Wrap(err, "会员已禁用，但注销已有登录状态失败")
+		}
+	}
+	return nil
 }
 
 // Switch 更新会员管理开关
@@ -259,5 +278,10 @@ func (s *sUserUser) Switch(ctx context.Context, in *userin.UserSwitchInp) (err e
 		err = gerror.Wrap(err, "更新会员管理开关失败，请稍后重试！")
 		return
 	}
-	return
+	if in.Key == dao.User.Columns().Status && !isUserEnabled(&entity.User{Status: gconv.String(in.Value)}) {
+		if err = token.RevokeAll(ctx, consts.AppApi, int64(in.Id)); err != nil {
+			return gerror.Wrap(err, "会员已禁用，但注销已有登录状态失败")
+		}
+	}
+	return nil
 }

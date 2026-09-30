@@ -1414,7 +1414,7 @@ CREATE TABLE IF NOT EXISTS `hg_sys_config` (
   `status` tinyint(1) DEFAULT '1' COMMENT '状态',
   `created_at` datetime DEFAULT NULL COMMENT '创建时间',
   `updated_at` datetime DEFAULT NULL COMMENT '更新时间'
-) ENGINE=InnoDB AUTO_INCREMENT=129 DEFAULT CHARSET=utf8mb4 COMMENT='系统_配置';
+) ENGINE=InnoDB AUTO_INCREMENT=133 DEFAULT CHARSET=utf8mb4 COMMENT='系统_配置';
 
 --
 -- 转存表中的数据 `hg_sys_config`
@@ -1438,7 +1438,7 @@ INSERT INTO `hg_sys_config` (`id`, `group`, `name`, `type`, `key`, `value`, `def
 (17, 'smtp', '管理员邮箱', 'string', 'smtpAdminMailbox', '133814250@qq.com', '133814250@qq.com', 140, '', 1, 1, '2021-01-30 13:27:43', '2023-02-04 16:59:13'),
 (28, 'upload', '上传驱动', 'string', 'uploadDrive', 'local', '', 300, 'local：本地;ucloud：ucloud;腾讯云:cos', 1, 1, '2021-01-30 13:27:43', '2024-02-28 16:56:35'),
 (29, 'upload', '上传图片大小限制', 'int', 'uploadImageSize', '1', '2', 310, '单位：MB', 1, 1, '2021-01-30 13:27:43', '2024-02-28 16:56:35'),
-(30, 'upload', '上传图片类型限制', 'string', 'uploadImageType', 'jpg,jpeg,gif,npm,png,svg', 'jpg,jpeg,gif,npm,png,svg', 320, '图片上传后缀类型限制', 1, 1, '2021-01-30 13:27:43', '2024-02-28 16:56:35'),
+(30, 'upload', '上传图片类型限制', 'string', 'uploadImageType', 'jpg,jpeg,gif,npm,png,svg,ico', 'jpg,jpeg,gif,npm,png,svg,ico', 320, '图片上传后缀类型限制', 1, 1, '2021-01-30 13:27:43', '2024-02-28 16:56:35'),
 (31, 'upload', '上传文件大小限制', 'int', 'uploadFileSize', '1000', '10', 330, '单位：MB', 1, 1, '2021-01-30 13:27:43', '2024-02-28 16:56:35'),
 (32, 'upload', '上传文件类型限制', 'string', 'uploadFileType', 'doc,docx,pdf,zip,tar,xls,xlsx,rar,jpg,jpeg,gif,npm,png,svg', 'doc,docx,zip,xls,xlsx,rar,jpg,jpeg,gif,npm,png,svg', 340, '文件上传后缀类型限制', 1, 1, '2021-01-30 13:27:43', '2024-02-28 16:56:35'),
 (33, 'upload', '本地存储路径', 'string', 'uploadLocalPath', 'attachment/', 'attachment/', 350, '对外访问的相对路径', 1, 1, '2021-01-30 13:27:43', '2024-02-28 16:56:35'),
@@ -1530,7 +1530,11 @@ INSERT INTO `hg_sys_config` (`id`, `group`, `name`, `type`, `key`, `value`, `def
 (126, 'upload', 'minio存储路径', 'string', 'uploadMinioPath', 'hotgo/attachment/', '', 650, '', 1, 1, '2021-01-30 13:27:43', '2024-02-28 16:56:35'),
 (127, 'upload', 'minio桶名称', 'string', 'uploadMinioBucket', '', '', 650, '', 1, 1, '2021-01-30 13:27:43', '2024-02-28 16:56:35'),
 (128, 'upload', 'minio对外访问域名', 'string', 'uploadMinioDomain', '', '', 650, '', 1, 1, '2021-01-30 13:27:43', '2024-02-28 16:56:35'),
-(129, 'login', '验证码方式', 'int', 'loginCaptchaType', '1', '2', 1200, '', 1, 1, '2025-06-25 17:04:39', '2025-06-25 17:23:15');
+(129, 'login', '验证码方式', 'int', 'loginCaptchaType', '1', '2', 1200, '', 1, 1, '2025-06-25 17:04:39', '2025-06-25 17:23:15'),
+(130, 'openai', 'API Key', 'string', 'openaiApiKey', '', '', 130, '用于访问模型服务的密钥', 1, 1, '2026-09-22 00:00:00', '2026-09-22 00:00:00'),
+(131, 'openai', '接口地址', 'string', 'openaiBaseUrl', 'https://api.gpt.ge/v1', 'https://api.gpt.ge/v1', 131, 'OpenAI兼容接口地址', 1, 1, '2026-09-22 00:00:00', '2026-09-22 00:00:00'),
+(132, 'openai', '默认模型', 'string', 'openaiDefaultModel', 'gpt-3.5-turbo', 'gpt-3.5-turbo', 132, '聊天会话未指定模型时使用', 1, 1, '2026-09-22 00:00:00', '2026-09-22 00:00:00'),
+(133, 'basic', '网站图标', 'string', 'basicFavicon', '', '', 25, '浏览器标签页图标，建议上传 .ico 格式文件', 1, 1, '2026-09-27 00:00:00', '2026-09-27 00:00:00');
 -- --------------------------------------------------------
 
 --
@@ -6133,7 +6137,7 @@ ALTER TABLE `hg_sys_blacklist`
 -- AUTO_INCREMENT for table `hg_sys_config`
 --
 ALTER TABLE `hg_sys_config`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '配置ID',AUTO_INCREMENT=129;
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '配置ID',AUTO_INCREMENT=133;
 --
 -- AUTO_INCREMENT for table `hg_sys_cron`
 --

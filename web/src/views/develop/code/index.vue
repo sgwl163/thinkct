@@ -322,11 +322,12 @@
           {
             label: '删除',
             onClick: handleDelete.bind(null, record),
+            ifShow: () => record.status === 2,
           },
           {
             label: '删除生成代码',
             onClick: handleDeleteBuild.bind(null, record),
-            ifShow: () => record.status === 1,
+            ifShow: () => record.status === 1 || record.status === 3,
           },
         ],
       });
@@ -347,7 +348,7 @@
   function handleDelete(record: Recordable) {
     dialog.warning({
       title: '警告',
-      content: '你确定要删除？',
+      content: '未生成的配置可直接删除；已生成或失败的配置请使用“删除生成代码”，以同步清理文件和菜单。',
       positiveText: '确定',
       negativeText: '取消',
       onPositiveClick: () => {

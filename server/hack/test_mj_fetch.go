@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 )
 
 func main() {
-	apiKey := "sk-S1rEFxwonvQR3wTx6d7d8a32C3E74c4389F1AeC7Fe7a1786"
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		panic("OPENAI_API_KEY is required")
+	}
 	taskId := "1784915543848681" // use the task ID from the previous run
 	
 	url := "https://api.gpt.ge/mj/task/" + taskId + "/fetch"

@@ -16,16 +16,17 @@ type LoginReq struct {
 }
 
 type LoginRes struct {
-	Token    string `json:"token" dc:"登录令牌"`
-	Expire   int64  `json:"expire" dc:"过期时间"`
-	Id       int64  `json:"id" dc:"用户ID"`
-	Username string `json:"username" dc:"用户名"`
-	Nickname string `json:"nickname" dc:"昵称"`
-	Avatar   string `json:"avatar" dc:"头像"`
-	Mobile   string `json:"mobile" dc:"Mobile number"`
-	Email    string `json:"email" dc:"邮箱"`
-	Money    uint   `json:"money" dc:"余额"`
-	Score    uint   `json:"score" dc:"积分"`
+	Token         string `json:"token" dc:"登录令牌"`
+	Expire        int64  `json:"expire" dc:"有效时长，单位秒"`
+	TokenExpireAt int64  `json:"tokenExpireAt" dc:"令牌过期时间，Unix时间戳"`
+	Id            int64  `json:"id" dc:"用户ID"`
+	Username      string `json:"username" dc:"用户名"`
+	Nickname      string `json:"nickname" dc:"昵称"`
+	Avatar        string `json:"avatar" dc:"头像"`
+	Mobile        string `json:"mobile" dc:"Mobile number"`
+	Email         string `json:"email" dc:"邮箱"`
+	Money         uint   `json:"money" dc:"余额"`
+	Score         uint   `json:"score" dc:"积分"`
 }
 
 type InfoReq struct {
@@ -33,17 +34,22 @@ type InfoReq struct {
 }
 
 type InfoRes struct {
-	Id       int64       `json:"id" dc:"用户ID"`
-	Username string      `json:"username" dc:"用户名"`
-	Nickname string      `json:"nickname" dc:"昵称"`
-	Avatar   string      `json:"avatar" dc:"头像"`
-	Mobile   string      `json:"mobile" dc:"Mobile number"`
-	Email    string      `json:"email" dc:"邮箱"`
-	Gender   uint        `json:"gender" dc:"性别:0=未知,1=男,2=女"`
-	Birthday *gtime.Time `json:"birthday" dc:"生日"`
-	Motto    string      `json:"motto" dc:"签名"`
-	Money    uint        `json:"money" dc:"余额"`
-	Score    uint        `json:"score" dc:"积分"`
+	Id          int64       `json:"id"          dc:"用户ID"`
+	Username    string      `json:"username"    dc:"用户名"`
+	Nickname    string      `json:"nickname"    dc:"昵称"`
+	Avatar      string      `json:"avatar"      dc:"头像"`
+	Mobile      string      `json:"mobile"      dc:"Mobile number"`
+	Email       string      `json:"email"       dc:"邮箱"`
+	Gender      uint        `json:"gender"      dc:"性别:0=未知,1=男,2=女"`
+	Birthday    *gtime.Time `json:"birthday"    dc:"生日"`
+	Motto       string      `json:"motto"       dc:"签名"`
+	JoinedAt    *gtime.Time `json:"joinedAt"    dc:"加入时间"`
+	LastLoginAt *gtime.Time `json:"lastLoginAt" dc:"上次登录时间"`
+	LastLoginIp string      `json:"lastLoginIp" dc:"上次登录IP"`
+	CreatedAt   *gtime.Time `json:"createdAt"   dc:"创建时间"`
+	UpdatedAt   *gtime.Time `json:"updatedAt"   dc:"更新时间"`
+	Money       uint        `json:"money"       dc:"余额"`
+	Score       uint        `json:"score"       dc:"积分"`
 }
 
 type RegisterReq struct {
@@ -56,16 +62,17 @@ type RegisterReq struct {
 }
 
 type RegisterRes struct {
-	Token    string `json:"token" dc:"登录令牌"`
-	Expire   int64  `json:"expire" dc:"过期时间"`
-	Id       int64  `json:"id" dc:"用户ID"`
-	Username string `json:"username" dc:"用户名"`
-	Nickname string `json:"nickname" dc:"昵称"`
-	Avatar   string `json:"avatar" dc:"头像"`
-	Mobile   string `json:"mobile" dc:"Mobile number"`
-	Email    string `json:"email" dc:"邮箱"`
-	Money    uint   `json:"money" dc:"余额"`
-	Score    uint   `json:"score" dc:"积分"`
+	Token         string `json:"token" dc:"登录令牌"`
+	Expire        int64  `json:"expire" dc:"有效时长，单位秒"`
+	TokenExpireAt int64  `json:"tokenExpireAt" dc:"令牌过期时间，Unix时间戳"`
+	Id            int64  `json:"id" dc:"用户ID"`
+	Username      string `json:"username" dc:"用户名"`
+	Nickname      string `json:"nickname" dc:"昵称"`
+	Avatar        string `json:"avatar" dc:"头像"`
+	Mobile        string `json:"mobile" dc:"Mobile number"`
+	Email         string `json:"email" dc:"邮箱"`
+	Money         uint   `json:"money" dc:"余额"`
+	Score         uint   `json:"score" dc:"积分"`
 }
 
 type LogoutReq struct {
@@ -182,7 +189,7 @@ type LoginLogListReq struct {
 
 type LoginLogListRes struct {
 	form.PageRes
-	List []*entity.UserLoginLog `json:"list" dc:"登录历史列表"`
+	List []*entity.UserLog `json:"list" dc:"登录历史列表"`
 }
 
 type CancelReq struct {

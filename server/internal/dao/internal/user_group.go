@@ -21,22 +21,22 @@ type UserGroupDao struct {
 
 // UserGroupColumns defines and stores column names for the table hg_user_group.
 type UserGroupColumns struct {
-	Id         string // ID
-	Name       string // 组名
-	Rules      string // 权限节点
-	Status     string // 状态:0=禁用,1=启用
-	UpdateTime string // 更新时间
-	CreateTime string // 创建时间
+	Id        string // ID
+	Name      string // 组名
+	Rules     string // 权限节点
+	Status    string // 状态:0=禁用,1=启用
+	UpdatedAt string // 更新时间
+	CreatedAt string // 创建时间
 }
 
 // userGroupColumns holds the columns for the table hg_user_group.
 var userGroupColumns = UserGroupColumns{
-	Id:         "id",
-	Name:       "name",
-	Rules:      "rules",
-	Status:     "status",
-	UpdateTime: "update_time",
-	CreateTime: "create_time",
+	Id:        "id",
+	Name:      "name",
+	Rules:     "rules",
+	Status:    "status",
+	UpdatedAt: "updated_at",
+	CreatedAt: "created_at",
 }
 
 // NewUserGroupDao creates and returns a new DAO object for table data access.

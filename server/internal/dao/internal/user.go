@@ -21,54 +21,54 @@ type UserDao struct {
 
 // UserColumns defines and stores column names for the table hg_user.
 type UserColumns struct {
-	Id            string // ID
-	GroupId       string // 分组ID
-	Username      string // 用户名
-	Nickname      string // 昵称
-	Email         string // 邮箱
-	Mobile        string // 手机
-	Avatar        string // 头像
-	Gender        string // 性别:0=未知,1=男,2=女
-	Birthday      string // 生日
-	Money         string // 余额
-	Score         string // 积分
-	LastLoginTime string // 上次登录时间
-	LastLoginIp   string // 上次登录IP
-	LoginFailure  string // 登录失败次数
-	JoinIp        string // 加入IP
-	JoinTime      string // 加入时间
-	Motto         string // 签名
-	Password      string // 密码
-	Salt          string // 密码盐（废弃待删）
-	Status        string // 状态:enable=启用,disable=禁用
-	UpdateTime    string // 更新时间
-	CreateTime    string // 创建时间
+	Id           string // ID
+	GroupId      string // 分组ID
+	Username     string // 用户名
+	Nickname     string // 昵称
+	Email        string // 邮箱
+	Mobile       string // 手机
+	Avatar       string // 头像
+	Gender       string // 性别:0=未知,1=男,2=女
+	Birthday     string // 生日
+	Money        string // 余额
+	Score        string // 积分
+	LastLoginAt  string // 上次登录时间
+	LastLoginIp  string // 上次登录IP
+	LoginFailure string // 登录失败次数
+	JoinIp       string // 加入IP
+	JoinedAt     string // 加入时间
+	Motto        string // 签名
+	Password     string // 密码
+	Salt         string // 密码盐（废弃待删）
+	Status       string // 状态:enable=启用,disable=禁用
+	UpdatedAt    string // 更新时间
+	CreatedAt    string // 创建时间
 }
 
 // userColumns holds the columns for the table hg_user.
 var userColumns = UserColumns{
-	Id:            "id",
-	GroupId:       "group_id",
-	Username:      "username",
-	Nickname:      "nickname",
-	Email:         "email",
-	Mobile:        "mobile",
-	Avatar:        "avatar",
-	Gender:        "gender",
-	Birthday:      "birthday",
-	Money:         "money",
-	Score:         "score",
-	LastLoginTime: "last_login_time",
-	LastLoginIp:   "last_login_ip",
-	LoginFailure:  "login_failure",
-	JoinIp:        "join_ip",
-	JoinTime:      "join_time",
-	Motto:         "motto",
-	Password:      "password",
-	Salt:          "salt",
-	Status:        "status",
-	UpdateTime:    "update_time",
-	CreateTime:    "create_time",
+	Id:           "id",
+	GroupId:      "group_id",
+	Username:     "username",
+	Nickname:     "nickname",
+	Email:        "email",
+	Mobile:       "mobile",
+	Avatar:       "avatar",
+	Gender:       "gender",
+	Birthday:     "birthday",
+	Money:        "money",
+	Score:        "score",
+	LastLoginAt:  "last_login_at",
+	LastLoginIp:  "last_login_ip",
+	LoginFailure: "login_failure",
+	JoinIp:       "join_ip",
+	JoinedAt:     "joined_at",
+	Motto:        "motto",
+	Password:     "password",
+	Salt:         "salt",
+	Status:       "status",
+	UpdatedAt:    "updated_at",
+	CreatedAt:    "created_at",
 }
 
 // NewUserDao creates and returns a new DAO object for table data access.

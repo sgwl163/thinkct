@@ -57,11 +57,3 @@ type DeleteReq struct {
 }
 
 type DeleteRes struct{}
-
-// StatusReq 更新规则管理状态
-type StatusReq struct {
-	g.Meta `path:"/userRule/status" method:"post" tags:"规则管理" summary:"更新规则管理状态"`
-	userin.UserRuleStatusInp
-}
-
-type StatusRes struct{}

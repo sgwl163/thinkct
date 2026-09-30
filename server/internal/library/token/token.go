@@ -12,7 +12,6 @@ import (
 	"hotgo/internal/library/cache"
 	"hotgo/internal/library/contexts"
 	"hotgo/internal/model"
-	"hotgo/utility/simple"
 	"time"
 
 	"github.com/gogf/gf/v2/crypto/gmd5"
@@ -52,6 +51,9 @@ func GetConfig() *model.TokenConfig {
 
 // Login 登录
 func Login(ctx context.Context, user *model.Identity) (string, int64, error) {
+	if user.TokenIssuedAt <= 0 {
+		user.TokenIssuedAt = gtime.TimestampNano()
+	}
 	claims := Claims{
 		user,
 		jwt.RegisteredClaims{},
@@ -131,6 +133,12 @@ func Logout(r *ghttp.Request) (err error) {
 	return
 }
 
+// RevokeAll 撤销指定用户此前签发的全部登录令牌。
+func RevokeAll(ctx context.Context, appName string, userId int64) error {
+	// 纳秒时间戳用于区分紧邻发生的“撤销旧令牌”和“重新登录签发新令牌”。
+	return cache.Instance().Set(ctx, GetRevokedAtKey(appName, userId), gtime.TimestampNano(), 0)
+}
+
 // ParseLoginUser 解析登录用户信息
 func ParseLoginUser(r *ghttp.Request) (user *model.Identity, err error) {
 	var (
@@ -148,6 +156,19 @@ func ParseLoginUser(r *ghttp.Request) (user *model.Identity, err error) {
 		g.Log().Debugf(ctx, "parseToken err:%+v", err)
 		err = errorLogin
 		return
+	}
+
+	// 修改密码、重置密码或注销账号后，拒绝此前签发的所有令牌。
+	revokedAt, revokeErr := cache.Instance().Get(ctx, GetRevokedAtKey(claims.App, claims.Id))
+	if revokeErr != nil {
+		g.Log().Debugf(ctx, "get revokedAt err:%+v", revokeErr)
+		err = errorLogin
+		return nil, err
+	}
+	if !revokedAt.IsEmpty() && (claims.TokenIssuedAt <= 0 || claims.TokenIssuedAt <= revokedAt.Int64()) {
+		g.Log().Debugf(ctx, "token has been revoked userId:%d", claims.Id)
+		err = errorLogin
+		return nil, err
 	}
 
 	var (
@@ -215,43 +236,24 @@ func ParseLoginUser(r *ghttp.Request) (user *model.Identity, err error) {
 		}
 	}
 
-	// 自动刷新token有效期
-	refreshToken := func() {
-		// 未开启自动刷新
-		if !config.AutoRefresh {
-			return
-		}
-
-		// 刷新次数已达上限
-		if config.MaxRefreshTimes != -1 && token.RefreshCount >= config.MaxRefreshTimes {
-			return
-		}
-
-		// 未达到刷新间隔
-		if gtime.New(token.RefreshAt).Unix()+config.RefreshInterval > now.Unix() {
-			return
-		}
-
-		// 刷新有效期
+	// 达到刷新间隔后同步续期，确保本次响应可返回准确的绝对过期时间。
+	if config.AutoRefresh &&
+		(config.MaxRefreshTimes == -1 || token.RefreshCount < config.MaxRefreshTimes) &&
+		token.RefreshAt+config.RefreshInterval <= now.Unix() {
 		token.ExpireAt = now.Unix() + config.Expires
 		token.RefreshAt = now.Unix()
-		token.RefreshCount += 1
+		token.RefreshCount++
 
 		duration := time.Second * gconv.Duration(config.Expires)
-
 		if err = cache.Instance().Set(ctx, tokenKey, token, duration); err != nil {
-			return
+			return nil, err
 		}
-
 		if err = cache.Instance().Set(ctx, bindKey, tokenKey, duration); err != nil {
-			return
+			return nil, err
 		}
 	}
 
-	simple.SafeGo(ctx, func(ctx context.Context) {
-		refreshToken()
-	})
-
+	r.Response.Header().Set("X-Token-Expire-At", gconv.String(token.ExpireAt))
 	user = claims.Identity
 	return
 }
@@ -312,4 +314,9 @@ func GetTokenKey(appName, authKey string) string {
 // GetBindKey 令牌身份绑定key
 func GetBindKey(appName string, userId int64) string {
 	return fmt.Sprintf("%v:%v:%v", consts.CacheTokenBind, appName, userId)
+}
+
+// GetRevokedAtKey 获取用户全部令牌撤销时间缓存key。
+func GetRevokedAtKey(appName string, userId int64) string {
+	return fmt.Sprintf("%v:%v:%v", consts.CacheTokenRevokedAt, appName, userId)
 }

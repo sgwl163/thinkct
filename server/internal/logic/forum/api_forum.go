@@ -118,7 +118,7 @@ func (s *sApiForum) UserProfile(ctx context.Context, req *v1.UserProfileReq) (re
 	}
 	var user *entity.User
 	userCols := dao.User.Columns()
-	if err = dao.User.Ctx(ctx).Fields(userCols.Motto, userCols.JoinTime).WherePri(req.UserId).Scan(&user); err != nil {
+	if err = dao.User.Ctx(ctx).Fields(userCols.Motto, userCols.JoinedAt).WherePri(req.UserId).Scan(&user); err != nil {
 		return nil, gerror.Wrap(err, "获取作者资料失败，请稍后重试")
 	}
 
@@ -186,7 +186,7 @@ func (s *sApiForum) UserProfile(ctx context.Context, req *v1.UserProfileReq) (re
 	}
 	if user != nil {
 		profile.Motto = user.Motto
-		profile.JoinTime = user.JoinTime
+		profile.JoinedAt = user.JoinedAt
 	}
 	return &v1.UserProfileRes{Profile: profile}, nil
 }

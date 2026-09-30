@@ -14,17 +14,22 @@ CREATE TABLE IF NOT EXISTS `hg_user_credits_log` (
   KEY `idx_user_type_created_at` (`user_id`, `credit_type`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户_资产变动流水';
 
-CREATE TABLE IF NOT EXISTS `hg_user_login_log` (
+CREATE TABLE IF NOT EXISTS `hg_user_log` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '日志ID',
   `user_id` bigint(20) NOT NULL DEFAULT '0' COMMENT '用户ID',
   `username` varchar(64) NOT NULL DEFAULT '' COMMENT '用户名',
-  `login_at` datetime DEFAULT NULL COMMENT '登录时间',
-  `login_ip` varchar(128) NOT NULL DEFAULT '' COMMENT '登录IP',
+  `log_type` varchar(32) NOT NULL DEFAULT '' COMMENT '记录类型:login=登录,operation=操作',
+  `action` varchar(64) NOT NULL DEFAULT '' COMMENT '操作标识',
+  `action_name` varchar(128) NOT NULL DEFAULT '' COMMENT '操作名称',
+  `event_at` datetime DEFAULT NULL COMMENT '事件时间',
+  `ip` varchar(128) NOT NULL DEFAULT '' COMMENT 'IP地址',
   `user_agent` varchar(512) NOT NULL DEFAULT '' COMMENT 'UA信息',
-  `err_msg` varchar(1000) NOT NULL DEFAULT '' COMMENT '错误提示',
+  `message` varchar(1000) NOT NULL DEFAULT '' COMMENT '结果消息',
+  `extra` text COMMENT '扩展数据',
   `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '状态',
   `created_at` datetime DEFAULT NULL COMMENT '创建时间',
   `updated_at` datetime DEFAULT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`),
-  KEY `idx_user_created_at` (`user_id`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户_登录日志';
+  KEY `idx_user_type_event_at` (`user_id`, `log_type`, `event_at`),
+  KEY `idx_action_event_at` (`action`, `event_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户_统一行为记录';

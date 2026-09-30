@@ -82,8 +82,11 @@ func (s *sOpenai) doMusicTask(ctx context.Context, taskId int64) {
 		return
 	}
 
-	apiKey := g.Cfg().MustGet(ctx, "openai.apiKey").String()
-	baseUrl := g.Cfg().MustGet(ctx, "openai.baseUrl").String()
+	apiKey, baseUrl, err := getModelConfig(ctx)
+	if err != nil {
+		s.markMusicFailed(ctx, taskId, "读取模型配置失败: "+err.Error())
+		return
+	}
 
 	if apiKey == "" || baseUrl == "" {
 		s.markMusicFailed(ctx, taskId, "配置不完整(apiKey or baseUrl)")
@@ -387,7 +390,7 @@ func (s *sOpenai) MusicSquare(ctx context.Context, req *v1.MusicSquareListReq) (
 	}
 
 	m := dao.OpenaiMusicTask.Ctx(ctx).Where(dao.OpenaiMusicTask.Columns().Status, 1)
-	
+
 	total, err := m.Count()
 	if err != nil {
 		return nil, err

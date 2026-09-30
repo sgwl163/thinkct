@@ -68,6 +68,7 @@ type SiteConfigRes struct {
 	WsAddr  string `json:"wsAddr"         dc:"客户端websocket地址"`
 	Domain  string `json:"domain"         dc:"对外域名"`
 	Mode    string `json:"mode"           dc:"运行模式"`
+	Favicon string `json:"favicon"        dc:"浏览器标签页图标"`
 }
 
 // SiteLoginConfigReq 获取登录配置

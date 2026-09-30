@@ -22,6 +22,16 @@ import { isWechatBrowser } from '@/utils/is';
 import { DeptTypeEnum } from '@/enums/deptEnum';
 const Storage = createStorage({ storage: localStorage });
 
+function updateFavicon(url: string) {
+  if (!url) {
+    return;
+  }
+  const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (favicon) {
+    favicon.href = url;
+  }
+}
+
 export interface UserInfoState {
   id: number;
   deptName: string;
@@ -59,6 +69,7 @@ export interface ConfigState {
   version: string;
   wsAddr: string;
   mode: string;
+  favicon: string;
 }
 
 export interface LoginConfigState {
@@ -216,6 +227,7 @@ export const useUserStore = defineStore({
             const result = res;
             that.setConfig(result);
             storage.set(CURRENT_CONFIG, result);
+            updateFavicon(result.favicon);
             resolve(res);
           })
           .catch((error) => {

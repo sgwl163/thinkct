@@ -27,15 +27,6 @@ export function Edit(params) {
   });
 }
 
-// 修改规则管理状态
-export function Status(params) {
-  return http.request({
-    url: '/userRule/status',
-    method: 'POST',
-    params,
-  });
-}
-
 // 获取规则管理指定详情
 export function View(params) {
   return http.request({
