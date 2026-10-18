@@ -89,13 +89,7 @@ func (s *sSysGenCodes) DeleteBuild(ctx context.Context, in *sysin.GenCodesDelete
 		}
 	}
 
-	serviceConfig := hggen.GetServiceConfig()
-	serviceConfig.Clear = true
-	if template.IsAddon {
-		serviceConfig.SrcFolder = "addons/" + record.AddonName + "/logic"
-		serviceConfig.DstFolder = "addons/" + record.AddonName + "/service"
-	}
-	if err = hggen.ServiceWithCfg(ctx, serviceConfig); err != nil {
+	if err = s.refreshBuildServices(ctx, &record, template); err != nil {
 		return gerror.Wrap(err, "更新业务服务失败")
 	}
 
@@ -106,6 +100,18 @@ func (s *sSysGenCodes) DeleteBuild(ctx context.Context, in *sysin.GenCodesDelete
 		return gerror.Wrap(err, "更新生成状态失败")
 	}
 	return
+}
+
+func (s *sSysGenCodes) refreshBuildServices(ctx context.Context, record *entity.SysGenCodes, template model.GenerateAppCrudTemplate) error {
+	serviceConfig := hggen.GetServiceConfig()
+	serviceConfig.Clear = true
+	if template.IsAddon {
+		serviceConfig.SrcFolder = "addons/" + record.AddonName + "/logic"
+		serviceConfig.DstFolder = "addons/" + record.AddonName + "/service"
+	}
+	// 清理逻辑按目标目录截取扫描出的绝对路径，统一系统分隔符，避免 Windows 下误删有效服务。
+	serviceConfig.DstFolder = gfile.Abs(serviceConfig.DstFolder)
+	return hggen.ServiceWithCfg(ctx, serviceConfig)
 }
 
 func (s *sSysGenCodes) getBuildFiles(ctx context.Context, record *entity.SysGenCodes) (paths []string, template model.GenerateAppCrudTemplate, err error) {
