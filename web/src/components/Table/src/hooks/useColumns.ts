@@ -1,22 +1,66 @@
 import { ref, Ref, ComputedRef, unref, computed, watch, toRaw, h } from 'vue';
 import type { BasicColumn, BasicTableProps } from '../types/table';
-import { isEqual, cloneDeep } from 'lodash-es';
-import { isArray, isString, isBoolean, isFunction } from '@/utils/is';
+import { cloneDeep } from 'lodash-es';
+import { isArray, isBoolean, isFunction } from '@/utils/is';
+import type { useTableSettings, TableColumnSetting } from './useTableSettings';
 import { usePermission } from '@/hooks/web/usePermission';
 import { ActionItem } from '@/components/Table';
 import { renderEditCell } from '../components/editable';
 import { NTooltip, NIcon } from 'naive-ui';
 import { FormOutlined } from '@vicons/antd';
 
-export function useColumns(propsRef: ComputedRef<BasicTableProps>) {
-  const columnsRef = ref(unref(propsRef).columns) as unknown as Ref<BasicColumn[]>;
-  let cacheColumns = unref(propsRef).columns;
+export function useColumns(
+  propsRef: ComputedRef<BasicTableProps>,
+  preferences: ReturnType<typeof useTableSettings>
+) {
+  const { settings, saveSettings } = preferences;
+  const columnsRef = ref<BasicColumn[]>([]) as Ref<BasicColumn[]>;
+  const cacheColumns = ref<BasicColumn[]>([]) as Ref<BasicColumn[]>;
+  const selection = ref(settings.value.selection ?? !!unref(propsRef).openChecked);
+
+  function restoreColumns() {
+    const defaults = cloneDeep(unref(propsRef).columns);
+    const saved = settings.value.columns || [];
+    const known = new Set(saved.map((column) => column.key));
+    const ordered = saved.flatMap((setting) => {
+      const column = defaults.find((item) => item.key === setting.key);
+      return column
+        ? [
+            {
+              ...column,
+              fixed: setting.fixed === undefined ? column.fixed : setting.fixed || undefined,
+            },
+          ]
+        : [];
+    });
+    ordered.push(...defaults.filter((column) => !known.has(column.key)));
+    cacheColumns.value = ordered;
+    columnsRef.value = ordered.filter((column) => {
+      const setting = saved.find((item) => item.key === column.key);
+      return !setting || setting.visible;
+    });
+  }
+
+  restoreColumns();
+
+  function saveColumns() {
+    const visible = new Set(columnsRef.value.map((column) => column.key));
+    const columns: TableColumnSetting[] = cacheColumns.value
+      .filter((column) => typeof column.key === 'string' || typeof column.key === 'number')
+      .map((column) => ({
+        key: column.key,
+        visible: visible.has(column.key),
+        fixed: column.fixed || false,
+      }));
+    saveSettings({ columns, selection: selection.value });
+  }
 
   const getColumnsRef = computed(() => {
     const columns = cloneDeep(unref(columnsRef));
-
+    if (selection.value && !columns.some((column) => (column as any).type === 'selection')) {
+      columns.unshift({ type: 'selection', key: 'selection' } as any);
+    }
     handleActionColumn(propsRef, columns);
-    if (!columns) return [];
     return columns;
   });
 
@@ -81,13 +125,7 @@ export function useColumns(propsRef: ComputedRef<BasicTableProps>) {
       });
   });
 
-  watch(
-    () => unref(propsRef).columns,
-    (columns) => {
-      columnsRef.value = columns;
-      cacheColumns = columns;
-    }
-  );
+  watch(() => unref(propsRef).columns, restoreColumns);
 
   function handleActionColumn(propsRef: ComputedRef<BasicTableProps>, columns: BasicColumn[]) {
     const { actionColumn } = unref(propsRef);
@@ -105,33 +143,51 @@ export function useColumns(propsRef: ComputedRef<BasicTableProps>) {
     }
   }
 
-  //设置
-  function setColumns(columnList: string[]) {
-    const columns: any[] = cloneDeep(columnList);
-    if (!isArray(columns)) return;
-
-    if (!columns.length) {
-      columnsRef.value = [];
-      return;
-    }
-    const cacheKeys = cacheColumns.map((item) => item.key);
-    //针对拖拽排序
-    if (!isString(columns[0])) {
-      columnsRef.value = columns;
-    } else {
-      const newColumns: any[] = [];
-      cacheColumns.forEach((item) => {
-        if (columnList.includes(item.key)) {
-          newColumns.push({ ...item });
-        }
-      });
-      if (!isEqual(cacheKeys, columns)) {
-        newColumns.sort((prev, next) => {
-          return cacheKeys.indexOf(prev.key) - cacheKeys.indexOf(next.key);
-        });
+  // 更新可见列，同时保留隐藏列的位置和固定设置。
+  function setColumns(columnList: BasicColumn[] | (string | number)[]) {
+    if (!isArray(columnList)) return;
+    const visible = new Map<string | number, BasicColumn>();
+    for (const value of columnList) {
+      const key = typeof value === 'object' ? value.key : value;
+      const column = cacheColumns.value.find((item) => item.key === key);
+      if (typeof value === 'object') {
+        const updated = { ...column, ...cloneDeep(value) };
+        if (column) Object.assign(column, updated);
+        else cacheColumns.value.push(updated);
+        visible.set(key, updated);
+      } else if (column) {
+        visible.set(key, column);
       }
-      columnsRef.value = newColumns;
     }
+    const ordered = [...visible.values()];
+    let index = 0;
+    cacheColumns.value = cacheColumns.value.map((column) =>
+      visible.has(column.key) ? ordered[index++] : column
+    );
+    columnsRef.value = ordered;
+    saveColumns();
+  }
+
+  function setColumnOrder(keys: (string | number)[]) {
+    const columns = cacheColumns.value;
+    cacheColumns.value = [
+      ...[...new Set(keys)].flatMap((key) => columns.filter((column) => column.key === key)),
+      ...columns.filter((column) => !keys.includes(column.key)),
+    ];
+    const visible = new Set(columnsRef.value.map((column) => column.key));
+    columnsRef.value = cacheColumns.value.filter((column) => visible.has(column.key));
+    saveColumns();
+  }
+
+  function setSelection(value: boolean) {
+    selection.value = value;
+    saveColumns();
+  }
+
+  function resetColumns() {
+    selection.value = !!unref(propsRef).openChecked;
+    saveSettings({ columns: undefined, selection: undefined });
+    restoreColumns();
   }
 
   //获取
@@ -144,20 +200,16 @@ export function useColumns(propsRef: ComputedRef<BasicTableProps>) {
 
   //获取原始
   function getCacheColumns(isKey?: boolean): any[] {
-    return isKey ? cacheColumns.map((item) => item.key) : cacheColumns;
+    return isKey ? cacheColumns.value.map((item) => item.key) : cloneDeep(cacheColumns.value);
   }
 
-  //更新原始数据单个字段
-  function setCacheColumnsField(key: string | undefined, value: Partial<BasicColumn>) {
-    if (!key || !value) {
-      return;
+  // 按 key 更新，避免隐藏列或勾选列改变下标后固定到错误的列。
+  function setCacheColumnsField(key: string | number | undefined, value: Partial<BasicColumn>) {
+    for (const columns of [cacheColumns.value, columnsRef.value]) {
+      const column = columns.find((item) => item.key === key);
+      if (column) Object.assign(column, value);
     }
-    cacheColumns.forEach((item) => {
-      if (item.key === key) {
-        Object.assign(item, value);
-        return;
-      }
-    });
+    saveColumns();
   }
 
   return {
@@ -165,6 +217,9 @@ export function useColumns(propsRef: ComputedRef<BasicTableProps>) {
     getCacheColumns,
     setCacheColumnsField,
     setColumns,
+    setColumnOrder,
+    setSelection,
+    resetColumns,
     getColumns,
     getPageColumns,
   };

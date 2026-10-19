@@ -1,5 +1,6 @@
 import { cloneDeep } from 'lodash-es';
 import { FormSchema } from '@/components/Form';
+import { defRangeShortcuts } from '@/utils/dateUtil';
 
 export class State {
   public id = 0; // ID
@@ -17,8 +18,8 @@ export class State {
   public remark = ''; // 备注
   public weigh = 0; // 权重
   public status = '1'; // 状态:0=禁用,1=启用
-  public updateTime = 0; // 更新时间
-  public createTime = 0; // 创建时间
+  public createdAt = ''; // 更新时间
+  public updatedAt = ''; // 创建时间
 
   constructor(state?: Partial<State>) {
     if (state) {
@@ -138,6 +139,19 @@ export const schemas = ref<FormSchema[]>([
       },
     },
   },
+  {
+    field: 'createdAt',
+    component: 'NDatePicker',
+    label: '更新时间',
+    componentProps: {
+      type: 'datetimerange',
+      clearable: true,
+      shortcuts: defRangeShortcuts(),
+      onUpdateValue: (e: any) => {
+        console.log(e);
+      },
+    },
+  },
 ]);
 
 // 表格列
@@ -234,13 +248,13 @@ export const columns = [
   },
   {
     title: '更新时间',
-    key: 'updateTime',
+    key: 'createdAt',
     align: 'left',
     width: -1,
   },
   {
     title: '创建时间',
-    key: 'createTime',
+    key: 'updatedAt',
     align: 'left',
     width: -1,
   },

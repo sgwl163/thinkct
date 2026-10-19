@@ -1,10 +1,11 @@
 import type { RouteRecordRaw } from 'vue-router';
-import { isNavigationFailure, Router } from 'vue-router';
+import { Router } from 'vue-router';
 import { useUserStoreWidthOut } from '@/store/modules/user';
 import { useAsyncRouteStoreWidthOut } from '@/store/modules/asyncRoute';
 import { ACCESS_TOKEN } from '@/store/mutation-types';
 import { storage } from '@/utils/Storage';
 import { PageEnum } from '@/enums/pageEnum';
+import { ResultEnum } from '@/enums/httpEnum';
 import { ErrorPageRoute } from '@/router/base';
 import { jump } from '@/utils/http/axios';
 import { getNowUrl } from '@/utils/urlUtils';
@@ -15,20 +16,15 @@ const whitePathList = [LOGIN_PATH]; // no redirect whitelist
 export function createRouterGuards(router: Router) {
   const userStore = useUserStoreWidthOut();
   const asyncRouteStore = useAsyncRouteStoreWidthOut();
-  router.beforeEach(async (to, from, next) => {
-    const Loading = window['$loading'] || null;
-    Loading && Loading.start();
+  let errorDialogOpen = false;
 
-    if (from.path === LOGIN_PATH && to.name === 'errorPage') {
-      next(PageEnum.BASE_HOME);
-      return;
-    }
+  router.beforeEach(async (to) => {
+    window['$loading']?.start();
 
     // Whitelist can be directly entered
     if (whitePathList.includes(to.path as PageEnum)) {
       await userStore.LoadLoginConfig();
-      next();
-      return;
+      return true;
     }
 
     const token = storage.get(ACCESS_TOKEN);
@@ -36,46 +32,28 @@ export function createRouterGuards(router: Router) {
     if (!token) {
       // You can access without permissions. You need to set the routing meta.ignoreAuth to true
       if (to.meta.ignoreAuth) {
-        next();
-        return;
+        return true;
       }
 
-      // redirect login page
-      const redirectData: { path: string; replace: boolean; query?: Recordable<string> } = {
+      return {
         path: LOGIN_PATH,
         replace: true,
+        query: { redirect: to.fullPath },
       };
-      if (to.path) {
-        redirectData.query = {
-          ...redirectData.query,
-          redirect: to.path,
-        };
-      }
-      next(redirectData);
-      return;
     }
 
     if (asyncRouteStore.getIsDynamicAddedRoute) {
-      next();
-      return;
+      return true;
     }
 
-    const redirectPath = (from.query.redirect || to.path) as string;
-    const redirect = decodeURIComponent(redirectPath);
-    const nextData = to.path === redirect ? { ...to, replace: true } : { path: redirect };
     const userInfo = await userStore.GetInfo();
     await userStore.LoadLoginConfig();
 
-    // 是否允许获取微信openid
+    // 是否允许获取微信openid，保留查询参数和页面锚点。
     if (userStore.allowWxOpenId()) {
-      let path = nextData.path;
-      if (path === LOGIN_PATH) {
-        path = PageEnum.BASE_HOME_REDIRECT;
-      }
-
-      const URI = getNowUrl() + '#' + path;
+      const URI = getNowUrl() + '#' + to.fullPath;
       jump('/wechat/authorize', { type: 'openId', syncRedirect: URI });
-      return;
+      return false;
     }
 
     await userStore.GetConfig();
@@ -86,27 +64,50 @@ export function createRouterGuards(router: Router) {
       router.addRoute(item as unknown as RouteRecordRaw);
     });
 
-    //添加404
-    const isErrorPage = router.getRoutes().findIndex((item) => item.name === ErrorPageRoute.name);
-    if (isErrorPage === -1) {
+    // 添加404
+    if (!router.hasRoute(ErrorPageRoute.name!)) {
       router.addRoute(ErrorPageRoute as unknown as RouteRecordRaw);
     }
 
     asyncRouteStore.setDynamicAddedRoute(true);
-    next(nextData);
-    Loading && Loading.finish();
+    // 新增路由后重新匹配目标页面，不再从上一页读取或解码回跳地址。
+    return { path: to.path, query: to.query, hash: to.hash, replace: true };
   });
 
   router.afterEach((to, _, failure) => {
-    document.title = (to?.meta?.title as string) || document.title;
-    if (isNavigationFailure(failure)) {
-      //console.log('failed navigation', failure)
+    if (!failure) {
+      document.title = (to.meta.title as string) || document.title;
     }
-    const Loading = window['$loading'] || null;
-    Loading && Loading.finish();
+    window['$loading']?.finish();
   });
 
-  router.onError((error) => {
-    console.log(error, '路由错误');
+  router.onError((error, to) => {
+    window['$loading']?.finish();
+    console.error('页面路由加载失败。', error);
+    const dialog = window['$dialog'];
+    if (!dialog || errorDialogOpen || error?.code === ResultEnum.TIMEOUT) {
+      return;
+    }
+
+    errorDialogOpen = true;
+    const closeDialog = () => {
+      errorDialogOpen = false;
+    };
+    dialog.warning({
+      title: '页面加载失败',
+      content: '页面、用户信息或菜单加载失败，请检查网络后重试；若仍然失败，请联系管理员。',
+      positiveText: '重试',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        try {
+          await router.replace(to.fullPath);
+          return true;
+        } catch {
+          // 保留当前对话框，网络恢复后可继续重试，避免叠加提示。
+          return false;
+        }
+      },
+      onAfterLeave: closeDialog,
+    });
   });
 }

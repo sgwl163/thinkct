@@ -26,7 +26,7 @@
       <n-tooltip trigger="hover">
         <template #trigger>
           <div class="mr-2 table-toolbar-right-icon">
-            <n-switch v-model:value="isStriped" @update:value="setStriped" />
+            <n-switch :value="isStriped" @update:value="setStriped" />
           </div>
         </template>
         <span>表格斑马纹</span>
@@ -53,7 +53,7 @@
               @select="densitySelect"
               trigger="click"
               :options="densityOptions"
-              v-model:value="tableSize"
+              :value="tableSize"
             >
               <n-icon size="18">
                 <ColumnHeightOutlined />
@@ -65,7 +65,7 @@
       </n-tooltip>
 
       <!--表格设置单独抽离成组件-->
-      <ColumnSetting :openChecked="openChecked" />
+      <ColumnSetting />
     </div>
   </div>
   <div class="s-table">
@@ -85,17 +85,7 @@
 </template>
 
 <script lang="ts">
-  import {
-    ref,
-    defineComponent,
-    reactive,
-    unref,
-    toRaw,
-    computed,
-    toRefs,
-    onMounted,
-    nextTick,
-  } from 'vue';
+  import { ref, defineComponent, watch, unref, toRaw, computed, onMounted, nextTick } from 'vue';
   import { ReloadOutlined, ColumnHeightOutlined, QuestionCircleOutlined } from '@vicons/antd';
   import { createTableContext } from './hooks/useTableContext';
 
@@ -103,6 +93,7 @@
 
   import { useLoading } from './hooks/useLoading';
   import { useColumns } from './hooks/useColumns';
+  import { useTableSettings } from './hooks/useTableSettings';
   import { useDataSource } from './hooks/useDataSource';
   import { usePagination } from './hooks/usePagination';
 
@@ -156,7 +147,6 @@
       const tableElRef = ref<ComponentRef>(null);
       const wrapRef = ref<Nullable<HTMLDivElement>>(null);
       let paginationEl: HTMLElement | null;
-      const isStriped = ref(false);
       const tableData = ref<Recordable[]>([]);
       const innerPropsRef = ref<Partial<BasicTableProps>>();
 
@@ -164,9 +154,22 @@
         return { ...props, ...unref(innerPropsRef) } as BasicTableProps;
       });
 
+      const preferences = useTableSettings(getProps);
+      const isStriped = computed(
+        () => preferences.settings.value.striped ?? !!unref(getProps).striped
+      );
       const { getLoading, setLoading } = useLoading(getProps);
 
       const { getPaginationInfo, setPagination } = usePagination(getProps);
+      const savedPageSize = preferences.settings.value.pageSize;
+      const paginationInfo = unref(getPaginationInfo);
+      if (
+        savedPageSize &&
+        typeof paginationInfo === 'object' &&
+        paginationInfo.pageSizes?.includes(savedPageSize)
+      ) {
+        setPagination({ pageSize: savedPageSize });
+      }
 
       const { getDataSourceRef, getDataSource, getRowKey, reload } = useDataSource(
         getProps,
@@ -179,13 +182,37 @@
         emit
       );
 
-      const { getPageColumns, setColumns, getColumns, getCacheColumns, setCacheColumnsField } =
-        useColumns(getProps);
+      const {
+        getPageColumns,
+        setColumns,
+        getColumns,
+        getCacheColumns,
+        setCacheColumnsField,
+        setColumnOrder,
+        setSelection,
+        resetColumns,
+      } = useColumns(getProps, preferences);
 
-      const state = reactive({
-        tableSize: unref(getProps as any).size || 'medium',
-        isColumnSetting: false,
-      });
+      const tableSize = computed(
+        () => preferences.settings.value.size || unref(getProps).size || 'medium'
+      );
+
+      // 已打开或 keep-alive 缓存的列表也跟随全局分页偏好，并同步对应数据。
+      watch(
+        () => preferences.settings.value.pageSize,
+        (size) => {
+          const info = unref(getPaginationInfo);
+          if (
+            size &&
+            typeof info === 'object' &&
+            info.pageSizes?.includes(size) &&
+            info.pageSize !== size
+          ) {
+            setPagination({ page: 1, pageSize: size });
+            reload();
+          }
+        }
+      );
 
       //页码切换
       function updatePage(page) {
@@ -194,23 +221,21 @@
       }
 
       //分页数量切换
-      function updatePageSize(size) {
+      function updatePageSize(size: number) {
         setPagination({ page: 1, pageSize: size });
+        preferences.saveSettings({ pageSize: size });
         reload();
       }
 
       //密度切换
-      function densitySelect(e) {
-        state.tableSize = e;
+      function densitySelect(size: 'small' | 'medium' | 'large') {
+        preferences.saveSettings({ size });
       }
 
       //选中行
       function updateCheckedRowKeys(rowKeys) {
         emit('update:checked-row-keys', rowKeys);
       }
-
-      //获取表格大小
-      const getTableSize = computed(() => state.tableSize);
 
       //组装表格信息
       const getBindValues = computed(() => {
@@ -222,7 +247,7 @@
           columns: toRaw(unref(getPageColumns)),
           rowKey: unref(getRowKey),
           data: tableData,
-          size: unref(getTableSize),
+          size: unref(tableSize),
           remote: true,
           'max-height': maxHeight,
         };
@@ -235,7 +260,9 @@
         innerPropsRef.value = { ...unref(innerPropsRef), ...props };
       }
 
-      const setStriped = (value: boolean) => (isStriped.value = value);
+      const setStriped = (value: boolean) => {
+        preferences.saveSettings({ striped: value });
+      };
 
       const tableAction = {
         reload,
@@ -246,6 +273,9 @@
         getPageColumns,
         getCacheColumns,
         setCacheColumnsField,
+        setColumnOrder,
+        setSelection,
+        resetColumns,
         emit,
       };
 
@@ -291,7 +321,7 @@
       createTableContext({ ...tableAction, wrapRef, getBindValues });
 
       return {
-        ...toRefs(state),
+        tableSize,
         tableElRef,
         getBindValues,
         getDataSource,

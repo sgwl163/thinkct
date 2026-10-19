@@ -1,5 +1,10 @@
 allowBuilds:
-  '@swc/core': false
+  # 构建工具需要校验原生二进制，vue-demi 需要匹配当前 Vue 版本。
+  '@swc/core': true
   core-js: false
-  esbuild: false
-  vue-demi: false
+  esbuild: true
+  vue-demi: true
+overrides:
+  # SWC 1.16 的 AST 变更会使顶层 await 转换报 missing field `type`。
+  'vite-plugin-top-level-await>@swc/core': 1.15.47
+  'vite-plugin-top-level-await>@swc/wasm': 1.15.47

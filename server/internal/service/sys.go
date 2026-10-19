@@ -7,6 +7,8 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"hotgo/internal/library/hgorm/handler"
 	"hotgo/internal/model"
 	"hotgo/internal/model/entity"
@@ -235,7 +237,7 @@ type (
 		DeleteBuild(ctx context.Context, in *sysin.GenCodesDeleteBuildInp) (err error)
 		// Edit 修改/新增
 		Edit(ctx context.Context, in *sysin.GenCodesEditInp) (res *sysin.GenCodesEditModel, err error)
-		// Status 更新部门状态
+		// Status 更新生成状态，事务提交成功后才允许向调用方报告完成。
 		Status(ctx context.Context, in *sysin.GenCodesStatusInp) (err error)
 		// MaxSort 最大排序
 		MaxSort(ctx context.Context, in *sysin.GenCodesMaxSortInp) (res *sysin.GenCodesMaxSortModel, err error)
@@ -255,6 +257,45 @@ type (
 		Preview(ctx context.Context, in *sysin.GenCodesPreviewInp) (res *sysin.GenCodesPreviewModel, err error)
 		// Build 提交生成
 		Build(ctx context.Context, in *sysin.GenCodesBuildInp) (err error)
+	}
+	IStatusDriver interface {
+		Master(...string) (*sql.DB, error)
+		New(core *gdb.Core, node *gdb.ConfigNode) (gdb.DB, error)
+		TableFields(ctx context.Context, table string, schema ...string) (map[string]*gdb.TableField, error)
+		DoSelect(ctx context.Context, link gdb.Link, query string, args ...any) (gdb.Result, error)
+		DoInsert(ctx context.Context, link gdb.Link, table string, data gdb.List, option gdb.DoInsertOption) (sql.Result, error)
+		DoUpdate(ctx context.Context, link gdb.Link, table string, data any, condition string, args ...any) (sql.Result, error)
+	}
+	IStatusResult interface {
+		LastInsertId() (int64, error)
+		RowsAffected() (int64, error)
+	}
+	ISessionConnector interface {
+		Connect(context.Context) (driver.Conn, error)
+		Driver() driver.Driver
+	}
+	ISessionSQLDriver interface {
+		Open(string) (driver.Conn, error)
+	}
+	ISessionConn interface {
+		Prepare(string) (driver.Stmt, error)
+		Close() error
+		Begin() (driver.Tx, error)
+		Commit() error
+		Rollback() error
+		ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error)
+		QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error)
+	}
+	ISessionRows interface {
+		Columns() []string
+		Close() error
+		Next(values []driver.Value) error
+	}
+	ISessionDriver interface {
+		New(core *gdb.Core, node *gdb.ConfigNode) (gdb.DB, error)
+		Master(...string) (*sql.DB, error)
+		Slave(...string) (*sql.DB, error)
+		TableFields(context.Context, string, ...string) (map[string]*gdb.TableField, error)
 	}
 	ISysLog interface {
 		// Model 请求日志Orm模型
@@ -427,6 +468,13 @@ var (
 	localSysDictType       ISysDictType
 	localSysEmsLog         ISysEmsLog
 	localSysGenCodes       ISysGenCodes
+	localStatusDriver      IStatusDriver
+	localStatusResult      IStatusResult
+	localSessionConnector  ISessionConnector
+	localSessionSQLDriver  ISessionSQLDriver
+	localSessionConn       ISessionConn
+	localSessionRows       ISessionRows
+	localSessionDriver     ISessionDriver
 	localSysLog            ISysLog
 	localSysLoginLog       ISysLoginLog
 	localSysNormalTreeDemo ISysNormalTreeDemo
@@ -568,6 +616,83 @@ func SysGenCodes() ISysGenCodes {
 
 func RegisterSysGenCodes(i ISysGenCodes) {
 	localSysGenCodes = i
+}
+
+func StatusDriver() IStatusDriver {
+	if localStatusDriver == nil {
+		panic("implement not found for interface IStatusDriver, forgot register?")
+	}
+	return localStatusDriver
+}
+
+func RegisterStatusDriver(i IStatusDriver) {
+	localStatusDriver = i
+}
+
+func StatusResult() IStatusResult {
+	if localStatusResult == nil {
+		panic("implement not found for interface IStatusResult, forgot register?")
+	}
+	return localStatusResult
+}
+
+func RegisterStatusResult(i IStatusResult) {
+	localStatusResult = i
+}
+
+func SessionConnector() ISessionConnector {
+	if localSessionConnector == nil {
+		panic("implement not found for interface ISessionConnector, forgot register?")
+	}
+	return localSessionConnector
+}
+
+func RegisterSessionConnector(i ISessionConnector) {
+	localSessionConnector = i
+}
+
+func SessionSQLDriver() ISessionSQLDriver {
+	if localSessionSQLDriver == nil {
+		panic("implement not found for interface ISessionSQLDriver, forgot register?")
+	}
+	return localSessionSQLDriver
+}
+
+func RegisterSessionSQLDriver(i ISessionSQLDriver) {
+	localSessionSQLDriver = i
+}
+
+func SessionConn() ISessionConn {
+	if localSessionConn == nil {
+		panic("implement not found for interface ISessionConn, forgot register?")
+	}
+	return localSessionConn
+}
+
+func RegisterSessionConn(i ISessionConn) {
+	localSessionConn = i
+}
+
+func SessionRows() ISessionRows {
+	if localSessionRows == nil {
+		panic("implement not found for interface ISessionRows, forgot register?")
+	}
+	return localSessionRows
+}
+
+func RegisterSessionRows(i ISessionRows) {
+	localSessionRows = i
+}
+
+func SessionDriver() ISessionDriver {
+	if localSessionDriver == nil {
+		panic("implement not found for interface ISessionDriver, forgot register?")
+	}
+	return localSessionDriver
+}
+
+func RegisterSessionDriver(i ISessionDriver) {
+	localSessionDriver = i
 }
 
 func SysLog() ISysLog {

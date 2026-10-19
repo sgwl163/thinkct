@@ -12,9 +12,10 @@ import (
 	"hotgo/internal/model/input/form"
 
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/os/gtime"
 )
 
-// UserRuleUpdateFields 修改规则管理字段过滤
+// UserRuleUpdateFields 修改权限规则字段过滤
 type UserRuleUpdateFields struct {
 	Pid          int    `json:"pid"          dc:"上级菜单"`
 	Type         string `json:"type"         dc:"类型:route=路由,menu_dir=菜单目录,menu=菜单项,nav_user_menu=顶栏会员菜单下拉项,nav=顶栏菜单项,button=页面按钮"`
@@ -30,11 +31,9 @@ type UserRuleUpdateFields struct {
 	Remark       string `json:"remark"       dc:"备注"`
 	Weigh        int    `json:"weigh"        dc:"权重"`
 	Status       string `json:"status"       dc:"状态:0=禁用,1=启用"`
-	UpdateTime   int64  `json:"updateTime"   dc:"更新时间"`
-	CreateTime   int64  `json:"createTime"   dc:"创建时间"`
 }
 
-// UserRuleInsertFields 新增规则管理字段过滤
+// UserRuleInsertFields 新增权限规则字段过滤
 type UserRuleInsertFields struct {
 	Pid          int    `json:"pid"          dc:"上级菜单"`
 	Type         string `json:"type"         dc:"类型:route=路由,menu_dir=菜单目录,menu=菜单项,nav_user_menu=顶栏会员菜单下拉项,nav=顶栏菜单项,button=页面按钮"`
@@ -50,11 +49,9 @@ type UserRuleInsertFields struct {
 	Remark       string `json:"remark"       dc:"备注"`
 	Weigh        int    `json:"weigh"        dc:"权重"`
 	Status       string `json:"status"       dc:"状态:0=禁用,1=启用"`
-	UpdateTime   int64  `json:"updateTime"   dc:"更新时间"`
-	CreateTime   int64  `json:"createTime"   dc:"创建时间"`
 }
 
-// UserRuleEditInp 修改/新增规则管理
+// UserRuleEditInp 修改/新增权限规则
 type UserRuleEditInp struct {
 	entity.UserRule
 }
@@ -121,7 +118,7 @@ func (in *UserRuleEditInp) Filter(ctx context.Context) (err error) {
 
 type UserRuleEditModel struct{}
 
-// UserRuleDeleteInp 删除规则管理
+// UserRuleDeleteInp 删除权限规则
 type UserRuleDeleteInp struct {
 	Id interface{} `json:"id" v:"required#ID不能为空" dc:"ID"`
 }
@@ -132,7 +129,7 @@ func (in *UserRuleDeleteInp) Filter(ctx context.Context) (err error) {
 
 type UserRuleDeleteModel struct{}
 
-// UserRuleViewInp 获取指定规则管理信息
+// UserRuleViewInp 获取指定权限规则信息
 type UserRuleViewInp struct {
 	Id int `json:"id" v:"required#ID不能为空" dc:"ID"`
 }
@@ -145,10 +142,11 @@ type UserRuleViewModel struct {
 	entity.UserRule
 }
 
-// UserRuleListInp 获取规则管理列表
+// UserRuleListInp 获取权限规则列表
 type UserRuleListInp struct {
 	form.PageReq
-	Id int `json:"id" dc:"ID"`
+	Id        int           `json:"id"        dc:"ID"`
+	CreatedAt []*gtime.Time `json:"createdAt" dc:"更新时间"`
 }
 
 func (in *UserRuleListInp) Filter(ctx context.Context) (err error) {
@@ -156,42 +154,42 @@ func (in *UserRuleListInp) Filter(ctx context.Context) (err error) {
 }
 
 type UserRuleListModel struct {
-	Id           int    `json:"id"           dc:"ID"`
-	Pid          int    `json:"pid"          dc:"上级菜单"`
-	Type         string `json:"type"         dc:"类型:route=路由,menu_dir=菜单目录,menu=菜单项,nav_user_menu=顶栏会员菜单下拉项,nav=顶栏菜单项,button=页面按钮"`
-	Title        string `json:"title"        dc:"标题"`
-	Name         string `json:"name"         dc:"规则名称"`
-	Path         string `json:"path"         dc:"路由路径"`
-	Icon         string `json:"icon"         dc:"图标"`
-	MenuType     string `json:"menuType"     dc:"菜单类型:tab=选项卡,link=链接,iframe=Iframe"`
-	Url          string `json:"url"          dc:"Url"`
-	Component    string `json:"component"    dc:"组件路径"`
-	NoLoginValid int    `json:"noLoginValid" dc:"未登录有效:0=否,1=是"`
-	Extend       string `json:"extend"       dc:"扩展属性:none=无,add_rules_only=只添加为路由,add_menu_only=只添加为菜单"`
-	Remark       string `json:"remark"       dc:"备注"`
-	Weigh        int    `json:"weigh"        dc:"权重"`
-	Status       string `json:"status"       dc:"状态:0=禁用,1=启用"`
-	UpdateTime   int64  `json:"updateTime"   dc:"更新时间"`
-	CreateTime   int64  `json:"createTime"   dc:"创建时间"`
+	Id           int         `json:"id"           dc:"ID"`
+	Pid          int         `json:"pid"          dc:"上级菜单"`
+	Type         string      `json:"type"         dc:"类型:route=路由,menu_dir=菜单目录,menu=菜单项,nav_user_menu=顶栏会员菜单下拉项,nav=顶栏菜单项,button=页面按钮"`
+	Title        string      `json:"title"        dc:"标题"`
+	Name         string      `json:"name"         dc:"规则名称"`
+	Path         string      `json:"path"         dc:"路由路径"`
+	Icon         string      `json:"icon"         dc:"图标"`
+	MenuType     string      `json:"menuType"     dc:"菜单类型:tab=选项卡,link=链接,iframe=Iframe"`
+	Url          string      `json:"url"          dc:"Url"`
+	Component    string      `json:"component"    dc:"组件路径"`
+	NoLoginValid int         `json:"noLoginValid" dc:"未登录有效:0=否,1=是"`
+	Extend       string      `json:"extend"       dc:"扩展属性:none=无,add_rules_only=只添加为路由,add_menu_only=只添加为菜单"`
+	Remark       string      `json:"remark"       dc:"备注"`
+	Weigh        int         `json:"weigh"        dc:"权重"`
+	Status       string      `json:"status"       dc:"状态:0=禁用,1=启用"`
+	CreatedAt    *gtime.Time `json:"createdAt"    dc:"更新时间"`
+	UpdatedAt    *gtime.Time `json:"updatedAt"    dc:"创建时间"`
 }
 
-// UserRuleExportModel 导出规则管理
+// UserRuleExportModel 导出权限规则
 type UserRuleExportModel struct {
-	Id           int    `json:"id"           dc:"ID"`
-	Pid          int    `json:"pid"          dc:"上级菜单"`
-	Type         string `json:"type"         dc:"类型:route=路由,menu_dir=菜单目录,menu=菜单项,nav_user_menu=顶栏会员菜单下拉项,nav=顶栏菜单项,button=页面按钮"`
-	Title        string `json:"title"        dc:"标题"`
-	Name         string `json:"name"         dc:"规则名称"`
-	Path         string `json:"path"         dc:"路由路径"`
-	Icon         string `json:"icon"         dc:"图标"`
-	MenuType     string `json:"menuType"     dc:"菜单类型:tab=选项卡,link=链接,iframe=Iframe"`
-	Url          string `json:"url"          dc:"Url"`
-	Component    string `json:"component"    dc:"组件路径"`
-	NoLoginValid int    `json:"noLoginValid" dc:"未登录有效:0=否,1=是"`
-	Extend       string `json:"extend"       dc:"扩展属性:none=无,add_rules_only=只添加为路由,add_menu_only=只添加为菜单"`
-	Remark       string `json:"remark"       dc:"备注"`
-	Weigh        int    `json:"weigh"        dc:"权重"`
-	Status       string `json:"status"       dc:"状态:0=禁用,1=启用"`
-	UpdateTime   int64  `json:"updateTime"   dc:"更新时间"`
-	CreateTime   int64  `json:"createTime"   dc:"创建时间"`
+	Id           int         `json:"id"           dc:"ID"`
+	Pid          int         `json:"pid"          dc:"上级菜单"`
+	Type         string      `json:"type"         dc:"类型:route=路由,menu_dir=菜单目录,menu=菜单项,nav_user_menu=顶栏会员菜单下拉项,nav=顶栏菜单项,button=页面按钮"`
+	Title        string      `json:"title"        dc:"标题"`
+	Name         string      `json:"name"         dc:"规则名称"`
+	Path         string      `json:"path"         dc:"路由路径"`
+	Icon         string      `json:"icon"         dc:"图标"`
+	MenuType     string      `json:"menuType"     dc:"菜单类型:tab=选项卡,link=链接,iframe=Iframe"`
+	Url          string      `json:"url"          dc:"Url"`
+	Component    string      `json:"component"    dc:"组件路径"`
+	NoLoginValid int         `json:"noLoginValid" dc:"未登录有效:0=否,1=是"`
+	Extend       string      `json:"extend"       dc:"扩展属性:none=无,add_rules_only=只添加为路由,add_menu_only=只添加为菜单"`
+	Remark       string      `json:"remark"       dc:"备注"`
+	Weigh        int         `json:"weigh"        dc:"权重"`
+	Status       string      `json:"status"       dc:"状态:0=禁用,1=启用"`
+	CreatedAt    *gtime.Time `json:"createdAt"    dc:"更新时间"`
+	UpdatedAt    *gtime.Time `json:"updatedAt"    dc:"创建时间"`
 }

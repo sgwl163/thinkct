@@ -27,15 +27,15 @@
   </div>
 </template>
 <script lang="ts" setup>
-  import { ref, onMounted } from 'vue';
+  import { ref, watch } from 'vue';
   import BasicSetting from './BasicSetting.vue';
   import SafetySetting from './SafetySetting.vue';
   import CashSetting from './CashSetting.vue';
   import ThirdBind from './ThirdBind.vue';
-  import { useRouter } from 'vue-router';
-  import {pushHashRouterParameter} from "@/utils/urlUtils";
+  import { useRoute } from 'vue-router';
+  import { setRouteQuery } from '@/utils/urlUtils';
 
-  const router = useRouter();
+  const route = useRoute();
   const type = ref(1);
   const typeTitle = ref('基本设置');
 
@@ -62,27 +62,18 @@
     },
   ];
 
-  onMounted(() => {
-    if (router.currentRoute.value.query?.type) {
-      setDefaultOption();
-    }
-  });
+  watch(
+    () => route.query.type,
+    (key) => {
+      const item = typeTabList.find((item) => String(item.key) === key) || typeTabList[0];
+      type.value = item.key;
+      typeTitle.value = item.name;
+    },
+    { immediate: true }
+  );
 
-  function setDefaultOption() {
-    const key = router.currentRoute.value.query.type as unknown as number;
-    if (key !== undefined && key > 0) {
-      for (const item of typeTabList) {
-        if (item.key == key) {
-          switchType(item);
-        }
-      }
-    }
-  }
-
-  function switchType(e) {
-    type.value = e.key;
-    typeTitle.value = e.name;
-    pushHashRouterParameter(window.location.href, 'type', e.key);
+  function switchType(e: (typeof typeTabList)[number]) {
+    setRouteQuery('type', e.key).catch(() => {});
   }
 </script>
 <style lang="less" scoped>

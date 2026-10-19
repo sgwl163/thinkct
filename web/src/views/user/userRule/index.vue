@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="n-layout-page-header">
-      <n-card :bordered="false" title="规则管理">
+      <n-card :bordered="false" title="权限规则">
         <!--  这是由系统生成的CURD表格，你可以将此行注释改为表格的描述 -->
       </n-card>
     </div>

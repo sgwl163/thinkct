@@ -10,6 +10,15 @@ const LayoutMap = new Map<string, () => Promise<typeof import('*.vue')>>();
 LayoutMap.set('LAYOUT', Layout);
 LayoutMap.set('IFRAME', Iframe);
 
+/** 规范化内部路由路径，保留查询参数、锚点和外链地址。 */
+function normalizeRoutePath(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  const suffixIndex = path.search(/[?#]/);
+  const pathname = suffixIndex === -1 ? path : path.slice(0, suffixIndex);
+  const suffix = suffixIndex === -1 ? '' : path.slice(suffixIndex);
+  return (pathname.replace(/\/+/g, '/').replace(/\/$/, '') || '/') + suffix;
+}
+
 /**
  * 格式化 后端 结构信息并递归生成层级路由表
  * @param routerMap
@@ -18,10 +27,10 @@ LayoutMap.set('IFRAME', Iframe);
  */
 export const routerGenerator = (routerMap, parent?): any[] => {
   return routerMap.map((item) => {
-    const rawPath = `${(parent && parent.path) || ''}/${item.path}`;
+    const path = normalizeRoutePath(`${(parent && parent.path) || ''}/${item.path}`);
     const currentRouter: any = {
-      // 路由地址 动态拼接生成如 /dashboard/workplace
-      path: rawPath,
+      // 子菜单沿用后端的层级拼接规则，统一清理重复斜杠。
+      path,
       // 路由名称，建议唯一
       name: item.name || '',
       // 该路由对应页面的 组件
@@ -35,20 +44,16 @@ export const routerGenerator = (routerMap, parent?): any[] => {
       },
     };
 
-    // 为了防止出现后端返回结果不规范，处理有可能出现拼接出两个 反斜杠
-    currentRouter.path = currentRouter.path.replace('//', '/');
-    // 重定向 ,菜单类型为目录默认默认跳转
-    if(item.meta.type === 1){
-      item.redirect && (currentRouter.redirect = item.redirect);
+    // 显式配置的目录跳转也需与路由路径使用相同的斜杠规则。
+    if (item.meta.type === 1 && item.redirect) {
+      currentRouter.redirect = normalizeRoutePath(item.redirect);
     }
-    // 是否有子菜单，并递归处理
+    // 先生成完整子路由，再使用实际地址作为目录的默认跳转。
     if (item.children && item.children.length > 0) {
-      //如果未定义 redirect 默认第一个子路由为 redirect
-      if(item.meta.type === 1) {
-        !item.redirect && (currentRouter.redirect = `${item.path}/${item.children[0].path}`);
-      }
-      // Recursion
       currentRouter.children = routerGenerator(item.children, currentRouter);
+      if (item.meta.type === 1 && !item.redirect) {
+        currentRouter.redirect = currentRouter.children[0].path;
+      }
     }
 
     return currentRouter;
@@ -76,9 +81,18 @@ export const generatorDynamicRouter = (): Promise<RouteRecordRaw[]> => {
 /**
  * 查找views中对应的组件文件
  * */
-let viewsModules: Record<string, () => Promise<Recordable>>;
+const currentViewModules = import.meta.glob('../views/**/*.{vue,tsx}');
+// 保留映射对象引用，让既有路由调用方在热更新后也能找到新生成的页面。
+const viewsModules: Record<string, () => Promise<Recordable>> =
+  import.meta.hot?.data.viewsModules || {};
+for (const key of Object.keys(viewsModules)) delete viewsModules[key];
+Object.assign(viewsModules, currentViewModules);
+if (import.meta.hot) {
+  import.meta.hot.data.viewsModules = viewsModules;
+  // 新增或删除页面只更新组件映射，避免生成期间反复刷新整页并中断请求。
+  import.meta.hot.accept();
+}
 export const asyncImportRoute = (routes: AppRouteRecordRaw[] | undefined): void => {
-  viewsModules = viewsModules || import.meta.glob('../views/**/*.{vue,tsx}');
   if (!routes) return;
   routes.forEach((item) => {
     if (!item.component && item.meta?.frameSrc) {
@@ -96,7 +110,7 @@ export const asyncImportRoute = (routes: AppRouteRecordRaw[] | undefined): void 
     } else if (name) {
       item.component = ParentLayout;
     }
-    children && asyncImportRoute(children);
+    if (children) asyncImportRoute(children);
   });
 };
 

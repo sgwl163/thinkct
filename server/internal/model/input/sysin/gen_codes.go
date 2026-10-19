@@ -7,6 +7,7 @@ package sysin
 
 import (
 	"context"
+	"github.com/gogf/gf/v2/encoding/gjson"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/text/gregex"
 	"github.com/gogf/gf/v2/util/gconv"
@@ -23,6 +24,26 @@ type GenCodesMaxSortInp struct {
 
 type GenCodesMaxSortModel struct {
 	Sort int `json:"sort" dc:"排序"`
+}
+
+// GenCodesUpdateFields 仅允许保存生成配置，生成状态由生成流程维护。
+type GenCodesUpdateFields struct {
+	GenType       uint        `json:"genType"`
+	GenTemplate   int         `json:"genTemplate"`
+	VarName       string      `json:"varName"`
+	Options       *gjson.Json `json:"options"`
+	DbName        string      `json:"dbName"`
+	TableName     string      `json:"tableName"`
+	TableComment  string      `json:"tableComment"`
+	DaoName       string      `json:"daoName"`
+	MasterColumns *gjson.Json `json:"masterColumns"`
+	AddonName     string      `json:"addonName"`
+}
+
+// GenCodesInsertFields 新增生成配置，初始状态由服务端设置。
+type GenCodesInsertFields struct {
+	GenCodesUpdateFields
+	Status int `json:"status"`
 }
 
 // GenCodesEditInp 修改/新增数据
@@ -61,8 +82,17 @@ type GenCodesViewInp struct {
 	Id int64 `json:"id" v:"required#生成代码ID不能为空" dc:"生成代码ID"`
 }
 
+type GenCodesBuildInfo struct {
+	BuildStatusLabel string `json:"buildStatusLabel" dc:"结合文件情况的生成状态说明"`
+	BuildFiles       int    `json:"buildFiles" dc:"已存在的生成文件数"`
+	BuildMessage     string `json:"buildMessage" dc:"生成结果说明"`
+	Building         bool   `json:"building" dc:"是否正在生成"`
+	BuildSucceeded   bool   `json:"buildSucceeded" dc:"生成流程是否成功完成"`
+}
+
 type GenCodesViewModel struct {
 	entity.SysGenCodes
+	GenCodesBuildInfo
 }
 
 // GenCodesListInp 获取列表
@@ -75,6 +105,7 @@ type GenCodesListInp struct {
 
 type GenCodesListModel struct {
 	entity.SysGenCodes
+	GenCodesBuildInfo
 	GenTemplateGroup string `json:"genTemplateGroup" dc:"生成模板组名"`
 }
 

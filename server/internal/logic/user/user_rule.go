@@ -34,12 +34,12 @@ func init() {
 	service.RegisterUserUserRule(NewUserUserRule())
 }
 
-// Model 规则管理ORM模型
+// Model 权限规则ORM模型
 func (s *sUserUserRule) Model(ctx context.Context, option ...*handler.Option) *gdb.Model {
 	return handler.Model(dao.UserRule.Ctx(ctx), option...)
 }
 
-// List 获取规则管理列表
+// List 获取权限规则列表
 func (s *sUserUserRule) List(ctx context.Context, in *userin.UserRuleListInp) (list []*userin.UserRuleListModel, totalCount int, err error) {
 	mod := s.Model(ctx)
 
@@ -51,6 +51,11 @@ func (s *sUserUserRule) List(ctx context.Context, in *userin.UserRuleListInp) (l
 		mod = mod.Where(dao.UserRule.Columns().Id, in.Id)
 	}
 
+	// 查询更新时间
+	if len(in.CreatedAt) == 2 {
+		mod = mod.WhereBetween(dao.UserRule.Columns().CreatedAt, in.CreatedAt[0], in.CreatedAt[1])
+	}
+
 	// 分页
 	mod = mod.Page(in.Page, in.PerPage)
 
@@ -59,13 +64,13 @@ func (s *sUserUserRule) List(ctx context.Context, in *userin.UserRuleListInp) (l
 
 	// 查询数据
 	if err = mod.ScanAndCount(&list, &totalCount, false); err != nil {
-		err = gerror.Wrap(err, "获取规则管理列表失败，请稍后重试！")
+		err = gerror.Wrap(err, "获取权限规则列表失败，请稍后重试！")
 		return
 	}
 	return
 }
 
-// Export 导出规则管理
+// Export 导出权限规则
 func (s *sUserUserRule) Export(ctx context.Context, in *userin.UserRuleListInp) (err error) {
 	list, totalCount, err := s.List(ctx, in)
 	if err != nil {
@@ -79,7 +84,7 @@ func (s *sUserUserRule) Export(ctx context.Context, in *userin.UserRuleListInp) 
 	}
 
 	var (
-		fileName  = "导出规则管理-" + gctx.CtxId(ctx)
+		fileName  = "导出权限规则-" + gctx.CtxId(ctx)
 		sheetName = fmt.Sprintf("索引条件共%v行,共%v页,当前导出是第%v页,本页共%v行", totalCount, form.CalPageCount(totalCount, in.PerPage), in.Page, len(list))
 		exports   []userin.UserRuleExportModel
 	)
@@ -92,7 +97,7 @@ func (s *sUserUserRule) Export(ctx context.Context, in *userin.UserRuleListInp) 
 	return
 }
 
-// Edit 修改/新增规则管理
+// Edit 修改/新增权限规则
 func (s *sUserUserRule) Edit(ctx context.Context, in *userin.UserRuleEditInp) (err error) {
 	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) (err error) {
 
@@ -101,7 +106,7 @@ func (s *sUserUserRule) Edit(ctx context.Context, in *userin.UserRuleEditInp) (e
 			if _, err = s.Model(ctx).
 				Fields(userin.UserRuleUpdateFields{}).
 				WherePri(in.Id).Data(in).Update(); err != nil {
-				err = gerror.Wrap(err, "修改规则管理失败，请稍后重试！")
+				err = gerror.Wrap(err, "修改权限规则失败，请稍后重试！")
 			}
 			return
 		}
@@ -110,26 +115,26 @@ func (s *sUserUserRule) Edit(ctx context.Context, in *userin.UserRuleEditInp) (e
 		if _, err = s.Model(ctx, &handler.Option{FilterAuth: false}).
 			Fields(userin.UserRuleInsertFields{}).
 			Data(in).OmitEmptyData().Insert(); err != nil {
-			err = gerror.Wrap(err, "新增规则管理失败，请稍后重试！")
+			err = gerror.Wrap(err, "新增权限规则失败，请稍后重试！")
 		}
 		return
 	})
 }
 
-// Delete 删除规则管理
+// Delete 删除权限规则
 func (s *sUserUserRule) Delete(ctx context.Context, in *userin.UserRuleDeleteInp) (err error) {
 
 	if _, err = s.Model(ctx).WherePri(in.Id).Unscoped().Delete(); err != nil {
-		err = gerror.Wrap(err, "删除规则管理失败，请稍后重试！")
+		err = gerror.Wrap(err, "删除权限规则失败，请稍后重试！")
 		return
 	}
 	return
 }
 
-// View 获取规则管理指定信息
+// View 获取权限规则指定信息
 func (s *sUserUserRule) View(ctx context.Context, in *userin.UserRuleViewInp) (res *userin.UserRuleViewModel, err error) {
 	if err = s.Model(ctx).WherePri(in.Id).Scan(&res); err != nil {
-		err = gerror.Wrap(err, "获取规则管理信息，请稍后重试！")
+		err = gerror.Wrap(err, "获取权限规则信息，请稍后重试！")
 		return
 	}
 	return

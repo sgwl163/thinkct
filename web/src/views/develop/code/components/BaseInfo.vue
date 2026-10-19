@@ -1,5 +1,11 @@
 <template>
   <div>
+    <n-alert v-if="loadError" type="warning" class="mb-2">
+      {{ loadError }}
+      <template #action>
+        <n-button size="small" :loading="bodyShow" @click="initialize">重新加载</n-button>
+      </template>
+    </n-alert>
     <n-spin :show="bodyShow" description="请稍候...">
       <n-card
         :bordered="true"
@@ -97,6 +103,7 @@
                   <n-radio-group v-model:value="formValue.options.tree.styleType" name="styleType">
                     <n-radio
                       v-for="status in selectList.treeStyleType"
+                      :key="status.value"
                       :value="status.value"
                       :label="status.label"
                       >{{ status.label }}</n-radio
@@ -291,7 +298,9 @@
         </template>
 
         <n-form ref="formRef" :model="formValue">
-          <n-alert type="warning" :show-icon="false" v-if="formValue.options?.join?.length > 3">关联表数量建议在三个以下</n-alert>
+          <n-alert type="warning" :show-icon="false" v-if="formValue.options?.join?.length > 3"
+            >关联表数量建议在三个以下</n-alert
+          >
           <div class="mt-4"></div>
           <n-row :gutter="6" v-for="(join, index) in formValue.options.join" :key="index">
             <n-col :span="6" style="min-width: 200px">
@@ -374,7 +383,7 @@
       </n-card>
     </n-spin>
 
-    <MenuModal ref="menuModalRef" @reloadTable="loadMenuTreeOption" />
+    <MenuModal ref="menuModalRef" @reload-table="loadMenuTreeOption" />
     <SetFuncDict
       ref="setFuncDictRef"
       @update="handleUpdateFuncDict"
@@ -384,8 +393,8 @@
 </template>
 
 <script lang="ts" setup>
-  import { onMounted, ref, computed, watch } from 'vue';
-  import { FormInst, useDialog, useMessage } from 'naive-ui';
+  import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue';
+  import { FormInst, useMessage } from 'naive-ui';
   import { newState, selectListObj } from './model';
   import { TableSelect, ColumnSelect } from '@/api/develop/code';
   import { getRandomString } from '@/utils/charset';
@@ -398,8 +407,12 @@
   import SetFuncDict from './SetFuncDict.vue';
 
   const message = useMessage();
-  const dialog = useDialog();
-  const timer = ref();
+  const loadError = ref('');
+  let disposed = false;
+  let loadVersion = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let finishDelay: (() => void) | undefined;
+  const quietRequest = { isShowErrorMessage: false };
   const formRef = ref<FormInst | null>(null);
   const bodyShow = ref(true);
   const tablesLoading = ref(false);
@@ -435,11 +448,10 @@
     selectList: selectListObj,
   });
 
-  watch(props, async (newVal, oldVal) => {
-    if (newVal.value.dbName != oldVal.value.dbName) {
-      await instLoad();
-    }
-  });
+  watch(
+    () => [props.value.id, props.value.dbName],
+    () => void initialize()
+  );
 
   const formValue = computed({
     get() {
@@ -450,21 +462,61 @@
     },
   });
 
-  onMounted(() => {
-    timer.value = setInterval(async () => {
-      if (props.value.id > 0) {
-        clearTimeout(timer.value);
-        await instLoad();
-        // 切换tab时会导致选项被清空，这里重新进行加载
-        await loadLinkColumnsOption();
-        await loadMenuTreeOption();
-        bodyShow.value = false;
-      }
-    }, 30);
+  onMounted(() => void initialize());
+  onBeforeUnmount(() => {
+    disposed = true;
+    loadVersion++;
+    stopDelay();
   });
 
+  function stopDelay() {
+    if (retryTimer !== undefined) clearTimeout(retryTimer);
+    retryTimer = undefined;
+    finishDelay?.();
+    finishDelay = undefined;
+  }
+
+  async function initialize() {
+    if (disposed) return;
+    const version = ++loadVersion;
+    stopDelay();
+    if (props.value.id < 1) {
+      bodyShow.value = false;
+      return;
+    }
+    bodyShow.value = true;
+    loadError.value = '';
+    try {
+      // 新增文件触发后端热重启时短暂失败可恢复；持续失败则释放遮罩并提供重试。
+      for (let attempt = 0; attempt < 5 && !disposed && version === loadVersion; attempt++) {
+        try {
+          await instLoad(version);
+          if (disposed || version !== loadVersion) return;
+          await loadLinkColumnsOption();
+          if (disposed || version !== loadVersion) return;
+          await loadMenuTreeOption();
+          return;
+        } catch (error: any) {
+          if (disposed || version !== loadVersion) return;
+          if (attempt === 4) {
+            loadError.value = `基本信息选项加载失败：${error?.message || '服务暂时不可用'}。请稍后重新加载。`;
+          } else {
+            await new Promise<void>((resolve) => {
+              finishDelay = resolve;
+              retryTimer = setTimeout(resolve, 1500);
+            });
+          }
+        }
+      }
+    } finally {
+      if (version === loadVersion) {
+        bodyShow.value = false;
+      }
+    }
+  }
+
   const loadMenuTreeOption = async () => {
-    const options = await getMenuList();
+    const options = await getMenuList(undefined, quietRequest);
     optionMenuTree.value = [
       {
         id: 0,
@@ -475,6 +527,7 @@
         type: 1,
       },
     ];
+    if (disposed) return;
     optionMenuTree.value = optionMenuTree.value.concat(options.list);
   };
 
@@ -482,24 +535,30 @@
     columnsOption.value = await loadColumnSelect(formValue.value.tableName);
   };
 
-  async function instLoad() {
+  async function instLoad(version: number) {
     columnsLoading.value = true;
     tablesLoading.value = true;
-    await loadSelect();
-    await loadTableSelect(formValue.value.dbName);
-    tablesLoading.value = false;
-    columnsLoading.value = false;
+    try {
+      await loadSelect();
+      if (disposed || version !== loadVersion) return;
+      await loadTableSelect(formValue.value.dbName);
+    } finally {
+      tablesLoading.value = false;
+      columnsLoading.value = false;
+    }
   }
 
   async function loadLinkColumnsOption() {
     if (formValue.value.options.join === undefined) {
       return;
     }
-    for (let i = 0; i < formValue.value.options.join.length; i++) {
-      linkColumnsLoading.value = true;
-      linkColumnsOption.value[formValue.value.options.join[i].uuid] = await loadColumnSelect(
-        formValue.value.options.join[i].linkTable
-      );
+    linkColumnsLoading.value = true;
+    try {
+      for (const join of formValue.value.options.join) {
+        if (disposed) return;
+        linkColumnsOption.value[join.uuid] = await loadColumnSelect(join.linkTable);
+      }
+    } finally {
       linkColumnsLoading.value = false;
     }
   }
@@ -507,18 +566,23 @@
   // 处理选项更新
   async function handleDbUpdateValue(value, _option) {
     tablesLoading.value = true;
-    await loadTableSelect(value);
-    tablesLoading.value = false;
+    try {
+      await loadTableSelect(value);
+    } catch (error: any) {
+      loadError.value = `数据库表选项加载失败：${error?.message || '请稍后重新加载'}`;
+    } finally {
+      tablesLoading.value = false;
+    }
   }
 
   async function loadTableSelect(value) {
-    const options = await TableSelect({ name: value });
+    const options = await TableSelect({ name: value }, quietRequest);
     tablesOption.value = cloneDeep(options);
     linkTablesOption.value = cloneDeep(options);
   }
 
   async function loadColumnSelect(value) {
-    return await ColumnSelect({ name: formValue.value.dbName, table: value });
+    return await ColumnSelect({ name: formValue.value.dbName, table: value }, quietRequest);
   }
 
   function handleTableUpdateValue(value, option) {
@@ -563,10 +627,15 @@
     }
 
     linkColumnsLoading.value = true;
-    linkColumnsOption.value[join.uuid] = await loadColumnSelect(join.linkTable);
-    // 清空更新前的字段
-    join.field = '';
-    linkColumnsLoading.value = false;
+    try {
+      linkColumnsOption.value[join.uuid] = await loadColumnSelect(join.linkTable);
+      // 清空更新前的字段
+      join.field = '';
+    } catch (error: any) {
+      loadError.value = `关联表字段加载失败：${error?.message || '请稍后重新加载'}`;
+    } finally {
+      linkColumnsLoading.value = false;
+    }
   }
 
   const joinAliasFeedback = ref('');

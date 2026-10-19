@@ -6,7 +6,7 @@
       :show-icon="false"
       preset="dialog"
       transform-origin="center"
-      :title="formValue.id > 0 ? '编辑规则管理 #' + formValue.id : '添加规则管理'"
+      :title="formValue.id > 0 ? '编辑权限规则 #' + formValue.id : '添加权限规则'"
       :style="{
         width: dialogWidth,
       }"
@@ -134,22 +134,6 @@
                   <n-input
                     placeholder="请输入状态:0=禁用,1=启用"
                     v-model:value="formValue.status"
-                    />
-                </n-form-item>
-              </n-gi>
-              <n-gi span="1">
-                <n-form-item label="更新时间" path="updateTime">
-                  <n-input-number
-                    placeholder="请输入更新时间"
-                    v-model:value="formValue.updateTime"
-                    />
-                </n-form-item>
-              </n-gi>
-              <n-gi span="1">
-                <n-form-item label="创建时间" path="createTime">
-                  <n-input-number
-                    placeholder="请输入创建时间"
-                    v-model:value="formValue.createTime"
                     />
                 </n-form-item>
               </n-gi>

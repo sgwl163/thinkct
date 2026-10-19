@@ -128,7 +128,7 @@
   import { useMessage, useLoadingBar } from 'naive-ui';
   import { ResultEnum } from '@/enums/httpEnum';
   import { PersonOutline, LockClosedOutline } from '@vicons/ionicons5';
-  import { PageEnum } from '@/enums/pageEnum';
+  import { getLoginRedirect } from '@/utils/urlUtils';
   import { SafetyCertificateOutlined, MobileOutlined } from '@vicons/antd';
   import { GetCaptcha } from '@/api/base';
   import { aesEcb } from '@/utils/encrypt';
@@ -172,7 +172,6 @@
   const route = useRoute();
   const { sendLabel, isCounting, loading: sendLoading, activateSend } = useSendCode();
   const emit = defineEmits(['updateActiveModule']);
-  const LOGIN_NAME = PageEnum.BASE_LOGIN_NAME;
   const debounceHandleSubmit = useDebounceFn((e) => {
     handleSubmit(e);
   }, 500);
@@ -291,13 +290,10 @@
       const { code, message: msg } = await request;
       message.destroyAll();
       if (code == ResultEnum.SUCCESS) {
-        const toPath = decodeURIComponent((route.query?.redirect || '/') as string);
+        const toPath = getLoginRedirect(route.query.redirect);
         message.success('登录成功，即将进入系统');
-        if (route.name === LOGIN_NAME) {
-          await router.replace('/');
-        } else {
-          await router.replace(toPath);
-        }
+        // 路由失败由全局守卫提供重试，避免登录按钮留下未处理的导航异常。
+        await router.replace(toPath).catch(() => {});
       } else {
         message.destroyAll();
         message.info(msg || '登录失败');

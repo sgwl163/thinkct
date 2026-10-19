@@ -34,15 +34,23 @@ var GenCodesTypeConfMap = map[int]string{
 
 // 生成代码状态
 const (
-	GenCodesStatusOk   = 1 // 生成成功
-	GenCodesStatusWait = 2 // 未生成
-	GenCodesStatusFail = 3 // 生成失败
+	GenCodesStatusOk      = 1 // 生成成功
+	GenCodesStatusWait    = 2 // 未生成
+	GenCodesStatusFail    = 3 // 生成失败
+	GenCodesStatusRunning = 4 // 生成中
 )
 
 var GenCodesStatusNameMap = map[int]string{
-	GenCodesStatusOk:   "生成成功",
-	GenCodesStatusWait: "未生成",
-	GenCodesStatusFail: "生成失败",
+	GenCodesStatusOk:      "生成成功",
+	GenCodesStatusWait:    "未生成",
+	GenCodesStatusFail:    "生成失败",
+	GenCodesStatusRunning: "生成中",
+}
+
+// GenCodesExistingFilesStatusNameMap 已有文件时的显示文案，不等同于生成流程已成功。
+var GenCodesExistingFilesStatusNameMap = map[int]string{
+	GenCodesStatusWait: "已有文件，待确认",
+	GenCodesStatusFail: "已有文件，未完成",
 }
 
 // 生成代码关联表方式

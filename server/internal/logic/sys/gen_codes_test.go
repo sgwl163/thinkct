@@ -55,7 +55,7 @@ func TestRefreshBuildServices(t *testing.T) {
 			}
 
 			writeFile("go.mod", "module example.com/servicecleanup\n\ngo 1.24.4\n")
-			writeFile(srcFolder+"/active/active.go", "package active\n\ntype sActive struct{}\n\nfunc (s *sActive) Run() string { return \"active\" }\n")
+			writeFile(srcFolder+"/active/active.go", "package active\n\nimport (\n\t\"github.com/gogf/gf/v2/database/gdb\"\n\t\"github.com/gogf/gf/v2/frame/g\"\n)\n\ntype sActive struct{}\n\nfunc (s *sActive) Model() *gdb.Model { return g.DB().Model(\"active\") }\n\nfunc (s *sActive) Run() string { return \"active\" }\n")
 			writeFile(srcFolder+"/other/other.go", "package other\n\ntype sOther struct{}\n\nfunc (s *sOther) Run() string { return \"other\" }\n")
 			writeFile(srcFolder+"/manual/manual.go", "package manual\n\ntype sManual struct{}\n\nfunc (s *sManual) Run() {}\n")
 			const manualContent = "package service\n\n// Manually maintained service.\ntype Manual interface {\n\tRun()\n}\n"
@@ -76,6 +76,10 @@ func TestRefreshBuildServices(t *testing.T) {
 				assertMissing(dstFolder + "/obsolete.go")
 				if pass == 0 {
 					assertFile(dstFolder+"/active.go", "IActive interface")
+					content, err := os.ReadFile(dstFolder + "/active.go")
+					if err != nil || strings.Contains(string(content), `"github.com/gogf/gf/v2/frame/g"`) {
+						t.Fatalf("service contains unused g import: %s, err=%v", content, err)
+					}
 					if err := os.Remove(srcFolder + "/active/active.go"); err != nil {
 						t.Fatal(err)
 					}

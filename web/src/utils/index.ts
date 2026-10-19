@@ -304,6 +304,10 @@ export function getChildrenRouter(routerMap: Array<any>) {
     if (info.children && info.children.length > 0) {
       // Recursion
       currentMenu.children = getChildrenRouter(info.children);
+      // 隐藏子页面过滤后，空数组会让 Naive UI 仍按目录处理，无法触发菜单选择。
+      if (currentMenu.children.length === 0) {
+        delete currentMenu.children;
+      }
     }
     return currentMenu;
   });

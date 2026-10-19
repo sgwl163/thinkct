@@ -54,6 +54,16 @@ export const useTabsViewStore = defineStore({
       }
       return true;
     },
+    replaceTabs(fullPath: string, route: RouteItem) {
+      if (isExcludedTabRoute(route)) return;
+      const index = this.tabsList.findIndex((item) => item.fullPath === fullPath);
+      if (index === -1) return;
+      // 参数替换仍属于当前标签页，移除路由监听可能已添加的目标标签。
+      this.tabsList[index] = route;
+      this.tabsList = this.tabsList.filter(
+        (item, itemIndex) => itemIndex === index || item.fullPath !== route.fullPath
+      );
+    },
     closeLeftTabs(route) {
       // 关闭左侧
       const index = this.tabsList.findIndex((item) => item.fullPath == route.fullPath);

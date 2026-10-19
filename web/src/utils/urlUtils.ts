@@ -1,5 +1,7 @@
 import { RouteLocationRaw } from 'vue-router';
 import router from '@/router';
+import { PageEnum } from '@/enums/pageEnum';
+import { useTabsViewStore } from '@/store/modules/tabsView';
 
 /**
  * 将对象添加当作参数拼接到URL上面
@@ -64,18 +66,49 @@ export function goBackOrToPage(to: RouteLocationRaw): void {
   }
 }
 
-//  更新hash路由get参数，不刷新页面
-export function pushHashRouterParameter(url, key, value) {
-  const urlParts = url.split('?');
-  let newUrl = '';
-  if (urlParts.length >= 2) {
-    const baseUrl = urlParts[0];
-    const queryString = urlParts[1];
-    const searchParams = new URLSearchParams(queryString);
-    searchParams.set(key, value);
-    newUrl = `${baseUrl}?${searchParams.toString()}`;
-  } else {
-    newUrl = `${url}?${key}=${value}`;
+/** 校验登录回跳地址。query 已由路由解码，保留原始参数编码，避免二次解码。 */
+export function getLoginRedirect(value: unknown): string {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) {
+    return PageEnum.BASE_HOME;
   }
-  window.history.pushState({ path: newUrl }, '', newUrl);
+
+  try {
+    const path = decodeURIComponent(value.split(/[?#]/)[0]);
+    if (
+      path.startsWith('//') ||
+      /[\\\s]/.test(path) ||
+      /[\u0000-\u001f\u007f]/.test(path + value) ||
+      path.replace(/\/+$/, '').toLowerCase() === PageEnum.BASE_LOGIN
+    ) {
+      return PageEnum.BASE_HOME;
+    }
+  } catch {
+    return PageEnum.BASE_HOME;
+  }
+
+  return value;
+}
+
+/** 更新当前页面查询参数，同时更新当前标签页，不增加后退记录。 */
+export async function setRouteQuery(key: string, value: string | number) {
+  const route = router.currentRoute.value;
+  const target = {
+    path: route.path,
+    query: { ...route.query, [key]: String(value) },
+    hash: route.hash,
+  };
+  const failure = await router.replace(target);
+  if (!failure && router.currentRoute.value.fullPath === router.resolve(target).fullPath) {
+    const { fullPath, hash, meta, name, params, path, query } = router.currentRoute.value;
+    useTabsViewStore().replaceTabs(route.fullPath, {
+      fullPath,
+      hash,
+      meta,
+      name: name as string,
+      params,
+      path,
+      query,
+    });
+  }
+  return failure;
 }

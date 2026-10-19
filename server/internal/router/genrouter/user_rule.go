@@ -9,5 +9,5 @@ package genrouter
 import "hotgo/internal/controller/admin/user"
 
 func init() {
-	LoginRequiredRouter = append(LoginRequiredRouter, user.UserRule) // 规则管理
+	LoginRequiredRouter = append(LoginRequiredRouter, user.UserRule) // 权限规则
 }

@@ -1,7 +1,7 @@
 <template>
   <div>
     <n-drawer v-model:show="showModal" :width="dialogWidth">
-      <n-drawer-content title="规则管理详情" closable>
+      <n-drawer-content title="权限规则详情" closable>
         <n-spin :show="loading" description="请稍候...">
           <n-descriptions label-placement="left" class="py-2" :column="1">
             <n-descriptions-item>
@@ -87,18 +87,6 @@
                 状态:0=禁用,1=启用
               </template>
               {{ formValue.status }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                更新时间
-              </template>
-              {{ formValue.updateTime }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                创建时间
-              </template>
-              {{ formValue.createTime }}
             </n-descriptions-item>
           </n-descriptions>
         </n-spin>

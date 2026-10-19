@@ -149,7 +149,7 @@
 </template>
 
 <script lang="ts" setup>
-  import { h, onBeforeMount, reactive, ref } from 'vue';
+  import { h, onActivated, onBeforeMount, reactive, ref } from 'vue';
   import { NTag, useDialog, useMessage } from 'naive-ui';
   import { BasicTable, TableAction } from '@/components/Table';
   import { BasicForm, FormSchema, useForm } from '@/components/Form/index';
@@ -223,19 +223,25 @@
       title: '生成状态',
       key: 'status',
       render(row) {
-        return h(
-          NTag,
-          {
-            style: {
-              marginRight: '6px',
+        return h('div', {}, [
+          h(
+            NTag,
+            {
+              type: row.building ? 'info' : row.buildSucceeded ? 'success' : 'warning',
+              bordered: false,
             },
-            type: row.status == 1 ? 'success' : 'warning',
-            bordered: false,
-          },
-          {
-            default: () => getOptionLabel(selectList.value.status, row.status),
-          }
-        );
+            {
+              default: () =>
+                row.buildStatusLabel || getOptionLabel(selectList.value.status, row.status),
+            }
+          ),
+          row.buildFiles > 0
+            ? h('div', { class: 'build-detail' }, `已有 ${row.buildFiles} 个文件`)
+            : null,
+          row.buildMessage
+            ? h('div', { class: 'build-detail', title: row.buildMessage }, row.buildMessage)
+            : null,
+        ]);
       },
       width: 150,
     },
@@ -322,12 +328,14 @@
           {
             label: '删除',
             onClick: handleDelete.bind(null, record),
-            ifShow: () => record.status === 2,
+            ifShow: () => record.status === 2 && !record.building && record.buildFiles === 0,
           },
           {
             label: '删除生成代码',
             onClick: handleDeleteBuild.bind(null, record),
-            ifShow: () => record.status === 1 || record.status === 3,
+            ifShow: () =>
+              !record.building &&
+              (record.status === 1 || record.status === 3 || record.buildFiles > 0),
           },
         ],
       });
@@ -348,7 +356,8 @@
   function handleDelete(record: Recordable) {
     dialog.warning({
       title: '警告',
-      content: '未生成的配置可直接删除；已生成或失败的配置请使用“删除生成代码”，以同步清理文件和菜单。',
+      content:
+        '未生成的配置可直接删除；已生成或失败的配置请使用“删除生成代码”，以同步清理文件和菜单。',
       positiveText: '确定',
       negativeText: '取消',
       onPositiveClick: () => {
@@ -515,6 +524,18 @@
   onBeforeMount(async () => {
     await loadSelect();
   });
+
+  // 从生成配置返回时刷新缓存列表，避免继续显示生成前的状态。
+  onActivated(() => {
+    actionRef.value?.reload();
+  });
 </script>
 
-<style lang="less" scoped></style>
+<style lang="less" scoped>
+  :deep(.build-detail) {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--n-text-color-3);
+    white-space: normal;
+  }
+</style>

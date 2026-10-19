@@ -22,12 +22,21 @@ export interface TableActionType {
   reload: (opt) => Promise<void>;
   emit?: any;
   getColumns: (opt?) => BasicColumn[];
-  setColumns: (columns: BasicColumn[] | string[]) => void;
+  setColumns: (columns: BasicColumn[] | (string | number)[]) => void;
+  getCacheColumns: (isKey?: boolean) => any[];
+  setCacheColumnsField: (key: string | number | undefined, value: Partial<BasicColumn>) => void;
+  setColumnOrder: (keys: (string | number)[]) => void;
+  setSelection: (value: boolean) => void;
+  resetColumns: () => void;
 }
 
 export interface BasicTableProps {
+  cacheKey?: string;
   title?: string;
-  dataSource: Function;
+  size?: 'small' | 'medium' | 'large';
+  striped?: boolean;
+  openChecked?: boolean;
+  dataSource: Recordable[];
   columns: any[];
   pagination: object;
   showPagination: boolean;

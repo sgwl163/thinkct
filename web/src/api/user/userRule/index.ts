@@ -1,6 +1,6 @@
 import { http, jumpExport } from '@/utils/http/axios';
 
-// 获取规则管理列表
+// 获取权限规则列表
 export function List(params) {
   return http.request({
     url: '/userRule/list',
@@ -9,7 +9,7 @@ export function List(params) {
   });
 }
 
-// 删除/批量删除规则管理
+// 删除/批量删除权限规则
 export function Delete(params) {
   return http.request({
     url: '/userRule/delete',
@@ -18,7 +18,7 @@ export function Delete(params) {
   });
 }
 
-// 添加/编辑规则管理
+// 添加/编辑权限规则
 export function Edit(params) {
   return http.request({
     url: '/userRule/edit',
@@ -27,7 +27,7 @@ export function Edit(params) {
   });
 }
 
-// 获取规则管理指定详情
+// 获取权限规则指定详情
 export function View(params) {
   return http.request({
     url: '/userRule/view',
@@ -36,7 +36,7 @@ export function View(params) {
   });
 }
 
-// 导出规则管理
+// 导出权限规则
 export function Export(params) {
   jumpExport('/userRule/export', params);
 }

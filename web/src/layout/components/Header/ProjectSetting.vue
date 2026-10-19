@@ -1,5 +1,5 @@
 <template>
-  <n-drawer v-model:show="isDrawer" :width="width" :placement="placement">
+  <n-drawer v-model:show="isDrawer" :width="width" placement="right">
     <n-drawer-content :title="title" :native-scrollbar="false">
       <div class="drawer">
         <n-divider title-placement="center">主题</n-divider>
@@ -136,10 +136,17 @@
         <div class="drawer-setting-item">
           <div class="drawer-setting-item-title"> 分割菜单 </div>
           <div class="drawer-setting-item-action">
-            <n-switch
-              :disabled="settingStore.navMode !== 'horizontal-mix'"
-              v-model:value="settingStore.menuSetting.mixMenu"
-            />
+            <n-tooltip :disabled="settingStore.navMode === 'horizontal-mix'" placement="left">
+              <template #trigger>
+                <span>
+                  <n-switch
+                    :disabled="settingStore.navMode !== 'horizontal-mix'"
+                    v-model:value="settingStore.menuSetting.mixMenu"
+                  />
+                </span>
+              </template>
+              仅顶部菜单混合模式支持分割菜单
+            </n-tooltip>
           </div>
         </div>
 
@@ -162,7 +169,10 @@
         <div class="drawer-setting-item">
           <div class="drawer-setting-item-title"> 固定多页签 </div>
           <div class="drawer-setting-item-action">
-            <n-switch v-model:value="settingStore.multiTabsSetting.fixed" />
+            <n-switch
+              :disabled="!settingStore.multiTabsSetting.show"
+              v-model:value="settingStore.multiTabsSetting.fixed"
+            />
           </div>
         </div>
 
@@ -183,9 +193,12 @@
         </div>
 
         <div class="drawer-setting-item">
-          <div class="drawer-setting-item-title"> 显示面包屑显示图标 </div>
+          <div class="drawer-setting-item-title"> 显示面包屑图标 </div>
           <div class="drawer-setting-item-action">
-            <n-switch v-model:value="settingStore.crumbsSetting.showIcon" />
+            <n-switch
+              :disabled="!settingStore.crumbsSetting.show"
+              v-model:value="settingStore.crumbsSetting.showIcon"
+            />
           </div>
         </div>
 
@@ -206,7 +219,7 @@
         <n-divider title-placement="center">动画</n-divider>
 
         <div class="drawer-setting-item">
-          <div class="drawer-setting-item-title"> 禁用动画 </div>
+          <div class="drawer-setting-item-title"> 开启动画 </div>
           <div class="drawer-setting-item-action">
             <n-switch v-model:value="settingStore.isPageAnimate" />
           </div>
@@ -215,105 +228,98 @@
         <div class="drawer-setting-item">
           <div class="drawer-setting-item-title"> 动画类型 </div>
           <div class="drawer-setting-item-select">
-            <n-select v-model:value="settingStore.pageAnimateType" :options="animateOptions" />
+            <n-select
+              v-model:value="settingStore.pageAnimateType"
+              :options="animateOptions"
+              :disabled="!settingStore.isPageAnimate"
+            />
           </div>
         </div>
 
         <div class="drawer-setting-item">
-          <n-alert type="warning" :showIcon="false">
-            <p>{{ alertText }}</p>
+          <n-alert type="info" :show-icon="false">
+            配置修改后自动保存到当前浏览器，刷新页面后仍然生效。可通过“恢复默认”重置主题与布局。
           </n-alert>
         </div>
       </div>
+      <template #footer>
+        <n-button block @click="resetSettings">恢复默认</n-button>
+      </template>
     </n-drawer-content>
   </n-drawer>
 </template>
 
-<script lang="ts">
-  import { defineComponent, reactive, toRefs, unref, watch, computed } from 'vue';
+<script lang="ts" setup>
+  import { ref, watch } from 'vue';
+  import { cloneDeep, omit } from 'lodash-es';
   import { useProjectSettingStore } from '@/store/modules/projectSetting';
   import { useDesignSettingStore } from '@/store/modules/designSetting';
   import { CheckOutlined } from '@vicons/antd';
   import { Moon, SunnySharp } from '@vicons/ionicons5';
-  import { darkTheme } from 'naive-ui';
+  import { useDialog } from 'naive-ui';
   import { animates as animateOptions } from '@/settings/animateSetting';
+  import projectSetting from '@/settings/projectSetting';
+  import designSetting from '@/settings/designSetting';
 
-  export default defineComponent({
-    name: 'ProjectSetting',
-    components: { CheckOutlined, Moon, SunnySharp },
-    props: {
-      title: {
-        type: String,
-        default: '项目配置',
-      },
-      width: {
-        type: Number,
-        default: 280,
-      },
-    },
-    setup(props) {
-      const settingStore = useProjectSettingStore();
-      const designStore = useDesignSettingStore();
-      const state = reactive({
-        width: props.width,
-        title: props.title,
-        isDrawer: false,
-        placement: 'right',
-        alertText:
-          '该功能主要实时预览各种布局效果，更多完整配置在 projectSetting.ts 中设置，建议在生产环境关闭该布局预览功能。',
-        appThemeList: designStore.appThemeList,
-      });
-
-      watch(
-        () => designStore.darkTheme,
-        (to) => {
-          settingStore.navTheme = to ? 'header-dark' : 'dark';
-        }
-      );
-
-      const directionsOptions = computed(() => {
-        return animateOptions.find((item) => item.value == unref(settingStore.pageAnimateType));
-      });
-
-      function openDrawer() {
-        state.isDrawer = true;
-      }
-
-      function closeDrawer() {
-        state.isDrawer = false;
-      }
-
-      function togNavTheme(theme) {
-        settingStore.navTheme = theme;
-        if (settingStore.navMode === 'horizontal' && ['light'].includes(theme)) {
-          settingStore.navTheme = 'dark';
-        }
-      }
-
-      function togTheme(color) {
-        designStore.appTheme = color;
-      }
-
-      function togNavMode(mode) {
-        settingStore.navMode = mode;
-        settingStore.menuSetting.mixMenu = false;
-      }
-
-      return {
-        ...toRefs(state),
-        settingStore,
-        designStore,
-        togNavTheme,
-        togNavMode,
-        togTheme,
-        darkTheme,
-        openDrawer,
-        closeDrawer,
-        animateOptions,
-        directionsOptions,
-      };
-    },
+  withDefaults(defineProps<{ title?: string; width?: number }>(), {
+    title: '项目配置',
+    width: 280,
   });
+
+  const settingStore = useProjectSettingStore();
+  const designStore = useDesignSettingStore();
+  const dialog = useDialog();
+  const isDrawer = ref(false);
+  const appThemeList = designStore.appThemeList;
+
+  watch(
+    () => designStore.darkTheme,
+    (to) => {
+      settingStore.navTheme = to ? 'header-dark' : 'dark';
+    },
+    { flush: 'sync' }
+  );
+
+  function openDrawer() {
+    isDrawer.value = true;
+  }
+
+  function closeDrawer() {
+    isDrawer.value = false;
+  }
+
+  function togNavTheme(theme: string) {
+    settingStore.navTheme =
+      settingStore.navMode === 'horizontal' && theme === 'light' ? 'dark' : theme;
+  }
+
+  function togTheme(color: string) {
+    designStore.appTheme = color;
+  }
+
+  function togNavMode(mode: string) {
+    settingStore.$patch({ navMode: mode, menuSetting: { mixMenu: false } });
+    togNavTheme(settingStore.navTheme);
+  }
+
+  function resetSettings() {
+    dialog.warning({
+      title: '恢复默认配置',
+      content: '确定恢复默认主题和布局吗？此操作不会退出登录或清除其他数据。',
+      positiveText: '恢复默认',
+      negativeText: '取消',
+      onPositiveClick: () => {
+        // 仅重置界面偏好，保留移动端状态、权限模式和内置主题列表。
+        designStore.$patch({
+          darkTheme: designSetting.darkTheme,
+          appTheme: designSetting.appTheme,
+        });
+        settingStore.$patch(cloneDeep(omit(projectSetting, ['isMobile', 'permissionMode'])));
+      },
+    });
+  }
+
+  defineExpose({ openDrawer, closeDrawer });
 </script>
 
 <style lang="less" scoped>

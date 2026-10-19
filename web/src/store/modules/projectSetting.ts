@@ -1,21 +1,8 @@
 import { defineStore } from 'pinia';
+import { cloneDeep } from 'lodash-es';
 import { store } from '@/store';
 import projectSetting from '@/settings/projectSetting';
 import type { IheaderSetting, ImenuSetting, ImultiTabsSetting, IcrumbsSetting } from '/#/config';
-
-const {
-  navMode,
-  navTheme,
-  isMobile,
-  headerSetting,
-  showFooter,
-  menuSetting,
-  multiTabsSetting,
-  crumbsSetting,
-  permissionMode,
-  isPageAnimate,
-  pageAnimateType,
-} = projectSetting;
 
 interface ProjectSettingState {
   navMode: string; //导航模式
@@ -33,19 +20,7 @@ interface ProjectSettingState {
 
 export const useProjectSettingStore = defineStore({
   id: 'app-project-setting',
-  state: (): ProjectSettingState => ({
-    navMode: navMode,
-    navTheme,
-    isMobile,
-    headerSetting,
-    showFooter,
-    menuSetting,
-    multiTabsSetting,
-    crumbsSetting,
-    permissionMode,
-    isPageAnimate,
-    pageAnimateType,
-  }),
+  state: (): ProjectSettingState => cloneDeep(projectSetting),
   getters: {
     getNavMode(): string {
       return this.navMode;

@@ -162,6 +162,7 @@
   import type { FormSchema, FormProps, FormActionType } from './types/form';
   import { isArray, isBoolean, isFunction } from '@/utils/is';
   import { deepMerge } from '@/utils';
+  import { useListSettingStore } from '@/store/modules/listSetting';
   import { usePermission } from '@/hooks/web/usePermission';
   import { ActionItem } from '@/components/Table';
 
@@ -178,7 +179,7 @@
       const propsRef = ref<Partial<FormProps>>({});
       const schemaRef = ref<Nullable<FormSchema[]>>(null);
       const formElRef = ref<Nullable<FormActionType>>(null);
-      const gridCollapsed = ref(true);
+      const listSetting = useListSettingStore();
       const loadingSub = ref(false);
       const isUpdateDefaultRef = ref(false);
       const { hasPermission } = usePermission();
@@ -231,6 +232,14 @@
         const { layout } = unref(getProps);
         return layout === 'inline';
       });
+
+      const gridCollapsed = computed(
+        () =>
+          isInline.value &&
+          !!unref(getProps).showAdvancedButton &&
+          !!unref(getProps).showActionButtonGroup &&
+          listSetting.searchCollapsed
+      );
 
       const getGrid = computed((): GridProps => {
         const { gridProps } = unref(getProps);
@@ -296,7 +305,8 @@
         });
 
       function unfoldToggle() {
-        gridCollapsed.value = !gridCollapsed.value;
+        if (!isInline.value || !unref(getProps).showAdvancedButton) return;
+        listSetting.setSearchCollapsed(!gridCollapsed.value);
       }
 
       async function setProps(formProps: Partial<FormProps>): Promise<void> {
@@ -312,17 +322,6 @@
         setProps,
         submit: handleSubmit,
       };
-
-      // 当showAdvancedButton为false时所有列表项应为全部显示
-      watch(
-        () => getProps.value.showAdvancedButton,
-        (show) => {
-          if (!show) gridCollapsed.value = false;
-        },
-        {
-          immediate: true,
-        }
-      );
 
       watch(
         () => getSchema.value,

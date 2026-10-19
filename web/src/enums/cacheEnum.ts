@@ -10,6 +10,15 @@ export const ROLES_KEY = 'ROLES__KEY__';
 // project config key
 export const PROJ_CFG_KEY = 'PROJ__CFG__KEY__';
 
+// design config key
+export const DESIGN_CFG_KEY = 'DESIGN__CFG__KEY__';
+
+// global list display preferences key
+export const LIST_CFG_KEY = 'LIST__CFG__KEY__';
+
+// table column preferences key
+export const TABLE_CFG_KEY = 'TABLE__CFG__KEY__';
+
 // lock info
 export const LOCK_INFO_KEY = 'LOCK__INFO__KEY__';
 

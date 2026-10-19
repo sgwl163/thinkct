@@ -33,22 +33,6 @@ type (
 		LoginLogList(ctx context.Context, req *v1.LoginLogListReq) (res *v1.LoginLogListRes, err error)
 		Cancel(ctx context.Context, req *v1.CancelReq) (res *v1.CancelRes, err error)
 	}
-	IUsergroup interface {
-		// Model 分组管理ORM模型
-		Model(ctx context.Context, option ...*handler.Option) *gdb.Model
-		// List 获取分组管理列表
-		List(ctx context.Context, in *userin.GroupListInp) (list []*userin.GroupListModel, totalCount int, err error)
-		// Export 导出分组管理
-		Export(ctx context.Context, in *userin.GroupListInp) (err error)
-		// Edit 修改/新增分组管理
-		Edit(ctx context.Context, in *userin.GroupEditInp) (err error)
-		// Delete 删除分组管理
-		Delete(ctx context.Context, in *userin.GroupDeleteInp) (err error)
-		// View 获取分组管理指定信息
-		View(ctx context.Context, in *userin.GroupViewInp) (res *userin.GroupViewModel, err error)
-		// Status 更新分组管理状态
-		Status(ctx context.Context, in *userin.GroupStatusInp) (err error)
-	}
 	IUserUser interface {
 		// Model 会员管理ORM模型
 		Model(ctx context.Context, option ...*handler.Option) *gdb.Model
@@ -67,6 +51,20 @@ type (
 		// Switch 更新会员管理开关
 		Switch(ctx context.Context, in *userin.UserSwitchInp) (err error)
 	}
+	IUserUserGroup interface {
+		// Model 用户分组ORM模型
+		Model(ctx context.Context, option ...*handler.Option) *gdb.Model
+		// List 获取用户分组列表
+		List(ctx context.Context, in *userin.UserGroupListInp) (list []*userin.UserGroupListModel, totalCount int, err error)
+		// Export 导出用户分组
+		Export(ctx context.Context, in *userin.UserGroupListInp) (err error)
+		// Edit 修改/新增用户分组
+		Edit(ctx context.Context, in *userin.UserGroupEditInp) (err error)
+		// Delete 删除用户分组
+		Delete(ctx context.Context, in *userin.UserGroupDeleteInp) (err error)
+		// View 获取用户分组指定信息
+		View(ctx context.Context, in *userin.UserGroupViewInp) (res *userin.UserGroupViewModel, err error)
+	}
 	IUserUserLog interface {
 		// Model 操作记录ORM模型
 		Model(ctx context.Context, option ...*handler.Option) *gdb.Model
@@ -84,27 +82,27 @@ type (
 		Status(ctx context.Context, in *userin.UserLogStatusInp) (err error)
 	}
 	IUserUserRule interface {
-		// Model 规则管理ORM模型
+		// Model 权限规则ORM模型
 		Model(ctx context.Context, option ...*handler.Option) *gdb.Model
-		// List 获取规则管理列表
+		// List 获取权限规则列表
 		List(ctx context.Context, in *userin.UserRuleListInp) (list []*userin.UserRuleListModel, totalCount int, err error)
-		// Export 导出规则管理
+		// Export 导出权限规则
 		Export(ctx context.Context, in *userin.UserRuleListInp) (err error)
-		// Edit 修改/新增规则管理
+		// Edit 修改/新增权限规则
 		Edit(ctx context.Context, in *userin.UserRuleEditInp) (err error)
-		// Delete 删除规则管理
+		// Delete 删除权限规则
 		Delete(ctx context.Context, in *userin.UserRuleDeleteInp) (err error)
-		// View 获取规则管理指定信息
+		// View 获取权限规则指定信息
 		View(ctx context.Context, in *userin.UserRuleViewInp) (res *userin.UserRuleViewModel, err error)
 	}
 )
 
 var (
-	localApiUser      IApiUser
-	localUsergroup    IUsergroup
-	localUserUser     IUserUser
-	localUserUserLog  IUserUserLog
-	localUserUserRule IUserUserRule
+	localApiUser       IApiUser
+	localUserUser      IUserUser
+	localUserUserGroup IUserUserGroup
+	localUserUserLog   IUserUserLog
+	localUserUserRule  IUserUserRule
 )
 
 func ApiUser() IApiUser {
@@ -118,17 +116,6 @@ func RegisterApiUser(i IApiUser) {
 	localApiUser = i
 }
 
-func Usergroup() IUsergroup {
-	if localUsergroup == nil {
-		panic("implement not found for interface IUsergroup, forgot register?")
-	}
-	return localUsergroup
-}
-
-func RegisterUsergroup(i IUsergroup) {
-	localUsergroup = i
-}
-
 func UserUser() IUserUser {
 	if localUserUser == nil {
 		panic("implement not found for interface IUserUser, forgot register?")
@@ -138,6 +125,17 @@ func UserUser() IUserUser {
 
 func RegisterUserUser(i IUserUser) {
 	localUserUser = i
+}
+
+func UserUserGroup() IUserUserGroup {
+	if localUserUserGroup == nil {
+		panic("implement not found for interface IUserUserGroup, forgot register?")
+	}
+	return localUserUserGroup
+}
+
+func RegisterUserUserGroup(i IUserUserGroup) {
+	localUserUserGroup = i
 }
 
 func UserUserLog() IUserUserLog {

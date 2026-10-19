@@ -8,6 +8,11 @@ export const basicProps = {
     type: String,
     default: null,
   },
+  // 同一页面需要独立缓存的多个表格，可指定不同的缓存标识。
+  cacheKey: {
+    type: String,
+    default: '',
+  },
   titleTooltip: {
     type: String,
     default: null,

@@ -19,7 +19,7 @@ var (
 
 type cUserRule struct{}
 
-// List 查看规则管理列表
+// List 查看权限规则列表
 func (c *cUserRule) List(ctx context.Context, req *userrule.ListReq) (res *userrule.ListRes, err error) {
 	list, totalCount, err := service.UserUserRule().List(ctx, &req.UserRuleListInp)
 	if err != nil {
@@ -36,19 +36,19 @@ func (c *cUserRule) List(ctx context.Context, req *userrule.ListReq) (res *userr
 	return
 }
 
-// Export 导出规则管理列表
+// Export 导出权限规则列表
 func (c *cUserRule) Export(ctx context.Context, req *userrule.ExportReq) (res *userrule.ExportRes, err error) {
 	err = service.UserUserRule().Export(ctx, &req.UserRuleListInp)
 	return
 }
 
-// Edit 更新规则管理
+// Edit 更新权限规则
 func (c *cUserRule) Edit(ctx context.Context, req *userrule.EditReq) (res *userrule.EditRes, err error) {
 	err = service.UserUserRule().Edit(ctx, &req.UserRuleEditInp)
 	return
 }
 
-// View 获取指定规则管理信息
+// View 获取指定权限规则信息
 func (c *cUserRule) View(ctx context.Context, req *userrule.ViewReq) (res *userrule.ViewRes, err error) {
 	data, err := service.UserUserRule().View(ctx, &req.UserRuleViewInp)
 	if err != nil {
@@ -60,7 +60,7 @@ func (c *cUserRule) View(ctx context.Context, req *userrule.ViewReq) (res *userr
 	return
 }
 
-// Delete 删除规则管理
+// Delete 删除权限规则
 func (c *cUserRule) Delete(ctx context.Context, req *userrule.DeleteReq) (res *userrule.DeleteRes, err error) {
 	err = service.UserUserRule().Delete(ctx, &req.UserRuleDeleteInp)
 	return

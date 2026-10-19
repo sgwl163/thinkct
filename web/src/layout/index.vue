@@ -108,7 +108,6 @@
     return fixed ? 'absolute' : 'static';
   });
 
-
   const isMixMenuNoneSub = computed(() => {
     const mixMenu = settingStore.menuSetting.mixMenu;
     // const currentRoute = useRoute();
@@ -129,7 +128,8 @@
   });
 
   const fixedMulti = computed(() => {
-    return unref(getMultiTabsSetting).fixed;
+    const { show, fixed } = unref(getMultiTabsSetting);
+    return show && fixed;
   });
 
   const inverted = computed(() => {

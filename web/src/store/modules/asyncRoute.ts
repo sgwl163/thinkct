@@ -87,7 +87,6 @@ export const useAsyncRouteStore = defineStore({
       this.keepAliveComponents = compNames;
     },
     async generateRoutes(data) {
-      let accessedRouters;
       const permissionsList = data.permissions || [];
       const routeFilter = (route) => {
         const { meta } = route;
@@ -97,36 +96,11 @@ export const useAsyncRouteStore = defineStore({
       };
       const { getPermissionMode } = useProjectSetting();
       const permissionMode = unref(getPermissionMode);
-      const $dialog = window['$dialog'];
-      if (permissionMode === 'BACK') {
-        // 动态获取菜单
-        try {
-          accessedRouters = await generatorDynamicRouter();
-        } catch (error) {
-          console.log(error);
-          $dialog.info({
-            title: '提示',
-            content: '获取动态路由失败，管理员请确认是否为角色分配菜单权限？',
-            positiveText: '确定',
-            onPositiveClick: () => {},
-          });
-        }
-      } else {
-        try {
-          //过滤账户是否拥有某一个权限，并将菜单从加载列表移除
-          accessedRouters = filter(asyncRoutes, routeFilter);
-        } catch (error) {
-          console.log(error);
-          $dialog.info({
-            title: '提示',
-            content: '过滤动态路由失败，请联系管理员解决！',
-            positiveText: '确定',
-            onPositiveClick: () => {},
-          });
-        }
-      }
-
-      accessedRouters = accessedRouters.filter(routeFilter);
+      const accessedRouters = (
+        permissionMode === 'BACK'
+          ? await generatorDynamicRouter()
+          : filter(asyncRoutes, routeFilter)
+      ).filter(routeFilter);
 
       this.setRouters(accessedRouters);
       this.setMenus(accessedRouters);

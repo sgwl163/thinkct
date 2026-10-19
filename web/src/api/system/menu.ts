@@ -1,3 +1,4 @@
+import type { RequestOptions } from '@/utils/http/axios/types';
 import { http } from '@/utils/http/axios';
 import { ApiEnum } from '@/enums/apiEnum';
 
@@ -15,12 +16,8 @@ export function adminMenus() {
  * 获取tree菜单列表
  * @param params
  */
-export function getMenuList(params?) {
-  return http.request({
-    url: '/menu/list',
-    method: 'GET',
-    params,
-  });
+export function getMenuList(params?, options?: RequestOptions) {
+  return http.request({ url: '/menu/list', method: 'GET', params }, options);
 }
 
 export function EditMenu(params?) {

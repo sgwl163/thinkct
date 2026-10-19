@@ -14,6 +14,14 @@ import { CreateAxiosOptions, RequestOptions, Result } from './types';
 import { useUserStoreWidthOut } from '@/store/modules/user';
 import router from '@/router';
 import { storage } from '@/utils/Storage';
+import {
+  ACCESS_TOKEN,
+  CURRENT_USER,
+  CURRENT_CONFIG,
+  CURRENT_DICT,
+  IS_LOCKSCREEN,
+  TABS_ROUTES,
+} from '@/store/mutation-types';
 import { encodeParams } from '@/utils/urlUtils';
 import { delNullProperty } from '@/utils/array';
 import { useI18nStore } from '@/store/modules/i18n';
@@ -91,6 +99,10 @@ const transform: AxiosTransform = {
     }
     // 接口请求错误，统一提示错误信息 这里逻辑可以根据项目进行修改
     let errorMsg = message;
+    // 显式关闭提示的请求由页面自行处理错误；登录失效仍走统一登录提示。
+    if (isShowErrorMessage === false && code !== ResultEnum.TIMEOUT) {
+      throw new Error(errorMsg || '请求失败');
+    }
     switch (code) {
       // 请求失败
       case ResultEnum.ERROR:
@@ -111,8 +123,30 @@ const transform: AxiosTransform = {
           closable: false,
           maskClosable: false,
           onPositiveClick: () => {
-            storage.clear();
-            window.location.href = LoginPath;
+            const userStore = useUserStoreWidthOut();
+            userStore.setToken('');
+            userStore.setPermissions([]);
+            userStore.setUserInfo(null);
+            // 仅移除登录相关缓存，保留主题、布局和语言偏好。
+            for (const key of [
+              ACCESS_TOKEN,
+              CURRENT_USER,
+              CURRENT_CONFIG,
+              CURRENT_DICT,
+              IS_LOCKSCREEN,
+              TABS_ROUTES,
+            ]) {
+              try {
+                storage.remove(key);
+              } catch (error) {
+                console.warn('清理登录缓存失败。', error);
+              }
+            }
+            // 登录是 Hash 内的路由，保留 /admin 等入口路径；重载以清除旧账户的动态路由。
+            router
+              .replace({ path: LoginPath, query: { redirect: router.currentRoute.value.fullPath } })
+              .catch(() => {})
+              .finally(() => window.location.reload());
           },
           onNegativeClick: () => {},
         });
@@ -122,7 +156,9 @@ const transform: AxiosTransform = {
         $message.error(errorMsg);
     }
 
-    throw new Error(errorMsg);
+    const error = new Error(errorMsg);
+    Object.assign(error, { code });
+    throw error;
   },
 
   // 请求之前处理config
@@ -151,7 +187,9 @@ const transform: AxiosTransform = {
       }
     } else {
       if (!isString(params)) {
-        formatDate && formatRequestDate(params);
+        if (formatDate) {
+          formatRequestDate(params);
+        }
         if (Reflect.has(config, 'data') && config.data && Object.keys(config.data).length > 0) {
           config.data = data;
           config.params = params;
@@ -196,6 +234,11 @@ const transform: AxiosTransform = {
    * @description: 响应错误处理
    */
   responseInterceptorsCatch: (error: any) => {
+    // 生成结果轮询等请求自行展示恢复状态，避免后端重启时重复弹出全局网络错误。
+    // 始终拒绝原始错误，保留请求配置和错误码供调用方判断。
+    if (error?.config?.requestOptions?.isShowErrorMessage === false) {
+      return Promise.reject(error);
+    }
     const $dialog = window['$dialog'];
     const $message = window['$message'];
     const { response, code, message } = error || {};

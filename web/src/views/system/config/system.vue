@@ -36,9 +36,9 @@
   </div>
 </template>
 <script lang="ts">
-  import { defineAsyncComponent, defineComponent, reactive, toRefs, onMounted } from 'vue';
-  import { useRouter } from 'vue-router';
-  import { pushHashRouterParameter } from '@/utils/urlUtils';
+  import { defineAsyncComponent, defineComponent, reactive, toRefs, watch } from 'vue';
+  import { useRoute } from 'vue-router';
+  import { setRouteQuery } from '@/utils/urlUtils';
   /** 异步加载的组件，用到的时候再加载组件 */
   const BasicSetting = defineAsyncComponent(() => {
       return import('./BasicSetting.vue');
@@ -163,34 +163,25 @@
       ModelSetting,
     },
     setup() {
-      const router = useRouter();
+      const route = useRoute();
       const state = reactive({
         type: 1,
         typeTitle: '基本设置',
       });
 
-      function switchType(e) {
-        state.type = e.key;
-        state.typeTitle = e.name;
-        pushHashRouterParameter(window.location.href, 'type', e.key);
+      function switchType(e: (typeof typeTabList)[number]) {
+        setRouteQuery('type', e.key).catch(() => {});
       }
 
-      function setDefaultOption() {
-        const key = router.currentRoute.value.query.type as unknown as number;
-        if (key !== undefined && key > 0) {
-          for (const item of typeTabList) {
-            if (item.key == key) {
-              switchType(item);
-            }
-          }
-        }
-      }
-
-      onMounted(() => {
-        if (router.currentRoute.value.query?.type) {
-          setDefaultOption();
-        }
-      });
+      watch(
+        () => route.query.type,
+        (key) => {
+          const item = typeTabList.find((item) => String(item.key) === key) || typeTabList[0];
+          state.type = item.key;
+          state.typeTitle = item.name;
+        },
+        { immediate: true }
+      );
 
       return {
         ...toRefs(state),

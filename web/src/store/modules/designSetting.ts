@@ -1,8 +1,7 @@
 import { defineStore } from 'pinia';
+import { cloneDeep } from 'lodash-es';
 import { store } from '@/store';
 import designSetting from '@/settings/designSetting';
-
-const { darkTheme, appTheme, appThemeList } = designSetting;
 
 interface DesignSettingState {
   //深色主题
@@ -15,11 +14,7 @@ interface DesignSettingState {
 
 export const useDesignSettingStore = defineStore({
   id: 'app-design-setting',
-  state: (): DesignSettingState => ({
-    darkTheme,
-    appTheme,
-    appThemeList,
-  }),
+  state: (): DesignSettingState => cloneDeep(designSetting),
   getters: {
     getDarkTheme(): boolean {
       return this.darkTheme;
