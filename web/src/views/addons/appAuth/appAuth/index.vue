@@ -12,11 +12,7 @@
         @submit="reloadTable"
         @reset="reloadTable"
         @keyup.enter="reloadTable"
-      >
-        <template #statusSlot="{ model, field }">
-          <n-input v-model:value="model[field]" />
-        </template>
-      </BasicForm>
+      />
       <BasicTable
         ref="actionRef"
         openChecked
@@ -72,7 +68,7 @@
         </template>
       </BasicTable>
     </n-card>
-    <Edit ref="editRef" @reloadTable="reloadTable" />
+    <Edit ref="editRef" @reload-table="reloadTable" />
     <View ref="viewRef" />
   </div>
 </template>
@@ -210,7 +206,7 @@
 
   // 批量删除
   function handleBatchDelete() {
-    if (checkedIds.value.length < 1){
+    if (checkedIds.value.length < 1) {
       message.error('请至少选择一项要删除的数据');
       return;
     }
@@ -248,8 +244,6 @@
 
   onMounted(() => {
     loadOptions();
-    
   });
 </script>
-
 <style lang="less" scoped></style>

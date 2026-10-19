@@ -33,6 +33,21 @@ func generationLock(id int64) *flock.Flock {
 	return flock.New(filepath.Join(os.TempDir(), fmt.Sprintf("hotgo-generate-%x-%d.lock", key[:12], id)))
 }
 
+// runBuildStage 记录关键阶段和耗时；不记录生成内容、SQL 或数据库配置。
+func runBuildStage(ctx context.Context, id int64, stage string, execute func(context.Context) error) error {
+	started := time.Now()
+	g.Log().Info(ctx, "代码生成阶段开始", g.Map{"id": id, "stage": stage})
+	succeeded := false
+	defer func() {
+		g.Log().Info(ctx, "代码生成阶段结束", g.Map{
+			"id": id, "stage": stage, "elapsedMs": time.Since(started).Milliseconds(), "succeeded": succeeded,
+		})
+	}()
+	err := execute(ctx)
+	succeeded = err == nil
+	return err
+}
+
 func (s *sSysGenCodes) build(ctx context.Context, in *sysin.GenCodesBuildInp, execute func(context.Context, *sysin.GenCodesBuildInp) error) (err error) {
 	lock := generationLock(0)
 	locked, err := lock.TryLock()
@@ -63,12 +78,14 @@ func (s *sSysGenCodes) build(ctx context.Context, in *sysin.GenCodesBuildInp, ex
 	// 客户端超时或离开页面不能取消最后的生成结果更新。
 	buildCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Minute)
 	defer cancel()
-	if err = s.Status(buildCtx, &sysin.GenCodesStatusInp{Id: in.Id, Status: consts.GenCodesStatusRunning}); err != nil {
+	if err = runBuildStage(buildCtx, in.Id, "保存生成中状态", func(ctx context.Context) error {
+		return s.Status(ctx, &sysin.GenCodesStatusInp{Id: in.Id, Status: consts.GenCodesStatusRunning})
+	}); err != nil {
 		return gerror.Wrap(err, "保存生成中状态失败")
 	}
 	var buildErr error
 	if panicErr := g.Try(buildCtx, func(ctx context.Context) {
-		buildErr = execute(ctx, in)
+		buildErr = runBuildStage(ctx, in.Id, "执行代码生成", func(ctx context.Context) error { return execute(ctx, in) })
 	}); panicErr != nil {
 		buildErr = panicErr
 	}
@@ -79,7 +96,9 @@ func (s *sSysGenCodes) build(ctx context.Context, in *sysin.GenCodesBuildInp, ex
 	}
 	statusCtx, statusCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer statusCancel()
-	if statusErr := s.Status(statusCtx, &sysin.GenCodesStatusInp{Id: in.Id, Status: status}); statusErr != nil {
+	if statusErr := runBuildStage(statusCtx, in.Id, "保存生成结果", func(ctx context.Context) error {
+		return s.Status(ctx, &sysin.GenCodesStatusInp{Id: in.Id, Status: status})
+	}); statusErr != nil {
 		if err != nil {
 			return gerror.Newf("生成未完成，且结果状态保存失败，请刷新核对：%s；%s", gerror.Current(err), gerror.Current(statusErr))
 		}
@@ -106,21 +125,29 @@ func (s *sSysGenCodes) executeBuild(ctx context.Context, in *sysin.GenCodesBuild
 			In:        &sysin.GenCodesPreviewInp{SysGenCodes: in.SysGenCodes},
 			DaoConfig: hggen.GetDaoConfig(in.DbName), Config: config,
 		},
-		BeforeEvent: views.CurdBuildEvent{"runDao": hggen.Dao},
+		BeforeEvent: views.CurdBuildEvent{"runDao": func(ctx context.Context) error {
+			return runBuildStage(ctx, in.Id, "生成 DAO", hggen.Dao)
+		}},
 		AfterEvent: views.CurdBuildEvent{"runService": func(ctx context.Context) error {
-			return s.generateBuildServices(ctx, &in.SysGenCodes, *config.Application.Crud.Templates[in.GenTemplate], false)
+			return runBuildStage(ctx, in.Id, "生成服务接口", func(ctx context.Context) error {
+				return s.generateBuildServices(ctx, &in.SysGenCodes, *config.Application.Crud.Templates[in.GenTemplate], false)
+			})
 		}},
 	}
 	if g.DB().GetConfig().Type != consts.DBMysql {
 		return views.Curd.DoBuild(ctx, buildInput)
 	}
-	preview, err := views.Curd.DoPreview(ctx, buildInput.PreviewIn)
-	if err != nil {
+	var preview *sysin.GenCodesPreviewModel
+	if err = runBuildStage(ctx, in.Id, "生成预览", func(ctx context.Context) error {
+		var previewErr error
+		preview, previewErr = views.Curd.DoPreview(ctx, buildInput.PreviewIn)
+		return previewErr
+	}); err != nil {
 		return err
 	}
 	before := func(ctx context.Context) error {
 		if gstr.InArray(in.Options.Get("autoOps").Strings(), "runDao") {
-			return hggen.Dao(ctx)
+			return buildInput.BeforeEvent["runDao"](ctx)
 		}
 		return nil
 	}
@@ -130,21 +157,26 @@ func (s *sSysGenCodes) executeBuild(ctx context.Context, in *sysin.GenCodesBuild
 		}
 		return nil
 	}
-	return s.publishBuildPreview(ctx, preview, before, after)
+	return s.publishBuildPreview(ctx, in.Id, preview, before, after)
 }
 
 // publishBuildPreview 保持 DAO、代码、service、菜单的先后顺序，不调用会改变连接会话的旧导入器。
-func (s *sSysGenCodes) publishBuildPreview(ctx context.Context, preview *sysin.GenCodesPreviewModel, before, after func(context.Context) error) error {
+func (s *sSysGenCodes) publishBuildPreview(ctx context.Context, id int64, preview *sysin.GenCodesPreviewModel, before, after func(context.Context) error) error {
 	if err := before(ctx); err != nil {
 		return err
 	}
-	for name, file := range preview.Views {
-		if name == "source.sql" || !shouldWriteBuildFile(file) {
-			continue
+	if err := runBuildStage(ctx, id, "发布代码文件", func(ctx context.Context) error {
+		for name, file := range preview.Views {
+			if name == "source.sql" || !shouldWriteBuildFile(file) {
+				continue
+			}
+			if err := publishGeneratedFile(file.Path, []byte(strings.TrimSpace(file.Content))); err != nil {
+				return gerror.Wrapf(err, "写入生成文件失败:%s", file.Path)
+			}
 		}
-		if err := gfile.PutContents(file.Path, strings.TrimSpace(file.Content)); err != nil {
-			return gerror.Wrapf(err, "写入生成文件失败:%s", file.Path)
-		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	if err := after(ctx); err != nil {
 		return err
@@ -153,14 +185,16 @@ func (s *sSysGenCodes) publishBuildPreview(ctx context.Context, preview *sysin.G
 	if !shouldWriteBuildFile(file) {
 		return nil
 	}
-	if err := gfile.PutContents(file.Path, strings.TrimSpace(file.Content)); err != nil {
-		return gerror.Wrap(err, "写入生成菜单 SQL 失败")
-	}
-	if err := dbutil.ImportMysqlMenuSQL(ctx, g.DB(), file.Content); err != nil {
-		_ = gfile.RemoveFile(file.Path)
-		return gerror.Wrap(err, "导入生成菜单 SQL 失败")
-	}
-	return nil
+	return runBuildStage(ctx, id, "发布并导入菜单", func(ctx context.Context) error {
+		if err := publishGeneratedFile(file.Path, []byte(strings.TrimSpace(file.Content))); err != nil {
+			return gerror.Wrap(err, "写入生成菜单 SQL 失败")
+		}
+		if err := dbutil.ImportMysqlMenuSQL(ctx, g.DB(), file.Content); err != nil {
+			_ = gfile.RemoveFile(file.Path)
+			return gerror.Wrap(err, "导入生成菜单 SQL 失败")
+		}
+		return nil
+	})
 }
 
 func shouldWriteBuildFile(file *sysin.GenFile) bool {

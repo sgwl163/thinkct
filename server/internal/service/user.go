@@ -51,6 +51,22 @@ type (
 		// Switch 更新会员管理开关
 		Switch(ctx context.Context, in *userin.UserSwitchInp) (err error)
 	}
+	IUserUserCreditsLog interface {
+		// Model 资产明细ORM模型
+		Model(ctx context.Context, option ...*handler.Option) *gdb.Model
+		// List 获取资产明细列表
+		List(ctx context.Context, in *userin.UserCreditsLogListInp) (list []*userin.UserCreditsLogListModel, totalCount int, err error)
+		// Export 导出资产明细
+		Export(ctx context.Context, in *userin.UserCreditsLogListInp) (err error)
+		// Edit 修改/新增资产明细
+		Edit(ctx context.Context, in *userin.UserCreditsLogEditInp) (err error)
+		// Delete 删除资产明细
+		Delete(ctx context.Context, in *userin.UserCreditsLogDeleteInp) (err error)
+		// View 获取资产明细指定信息
+		View(ctx context.Context, in *userin.UserCreditsLogViewInp) (res *userin.UserCreditsLogViewModel, err error)
+		// Status 更新资产明细状态
+		Status(ctx context.Context, in *userin.UserCreditsLogStatusInp) (err error)
+	}
 	IUserUserGroup interface {
 		// Model 用户分组ORM模型
 		Model(ctx context.Context, option ...*handler.Option) *gdb.Model
@@ -98,11 +114,12 @@ type (
 )
 
 var (
-	localApiUser       IApiUser
-	localUserUser      IUserUser
-	localUserUserGroup IUserUserGroup
-	localUserUserLog   IUserUserLog
-	localUserUserRule  IUserUserRule
+	localApiUser            IApiUser
+	localUserUser           IUserUser
+	localUserUserCreditsLog IUserUserCreditsLog
+	localUserUserGroup      IUserUserGroup
+	localUserUserLog        IUserUserLog
+	localUserUserRule       IUserUserRule
 )
 
 func ApiUser() IApiUser {
@@ -125,6 +142,17 @@ func UserUser() IUserUser {
 
 func RegisterUserUser(i IUserUser) {
 	localUserUser = i
+}
+
+func UserUserCreditsLog() IUserUserCreditsLog {
+	if localUserUserCreditsLog == nil {
+		panic("implement not found for interface IUserUserCreditsLog, forgot register?")
+	}
+	return localUserUserCreditsLog
+}
+
+func RegisterUserUserCreditsLog(i IUserUserCreditsLog) {
+	localUserUserCreditsLog = i
 }
 
 func UserUserGroup() IUserUserGroup {

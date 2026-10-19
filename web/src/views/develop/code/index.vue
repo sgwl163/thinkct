@@ -431,7 +431,7 @@
     formRef.value.validate((errors) => {
       if (!errors) {
         Edit(formParams.value).then((res) => {
-          message.success('生成成功，正在前往配置');
+          message.success('配置已创建，正在前往配置');
           setTimeout(() => {
             showModal.value = false;
             router.push({ name: 'develop_code_deploy', params: { id: res.id } });

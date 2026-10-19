@@ -130,6 +130,47 @@ test('详情稍后返回有效 ID 时自动初始化，不使用永久轮询', a
   component.unmount();
 });
 
+test('生成结果刷新但 ID 和数据库不变时，不重复加载选项或显示请稍候', async () => {
+  let reads = 0;
+  const component = loadComponent({
+    column: async () => {
+      reads++;
+      return [];
+    },
+  });
+  await component.settle();
+  assert.equal(reads, 1);
+  for (const status of [4, 1, 1]) {
+    component.props.value = { ...component.props.value, status };
+    await vue.nextTick();
+    assert.equal(component.state.bodyShow.value, false, '结果刷新重新打开了请稍候遮罩');
+    await component.settle();
+  }
+  assert.equal(reads, 1, '相同配置的结果刷新重复请求了字段选项');
+  component.props.value = { ...component.props.value, dbName: 'other' };
+  await component.settle();
+  assert.equal(reads, 2, '切换数据库后没有重新加载选项');
+  component.unmount();
+});
+
+test('选项请求未完成时同步相同配置的生成状态，不启动第二轮初始化', async () => {
+  let finish;
+  let reads = 0;
+  const component = loadComponent({
+    column: () => {
+      reads++;
+      return new Promise((resolve) => (finish = resolve));
+    },
+  });
+  component.props.value = { ...component.props.value, status: 1 };
+  await vue.nextTick();
+  assert.equal(reads, 1, '结果同步使未完成的初始化重复启动');
+  finish([]);
+  await component.settle();
+  assert.equal(component.state.bodyShow.value, false);
+  component.unmount();
+});
+
 test('等待详情时卸载组件会停止所有定时任务', async () => {
   const component = loadComponent({ id: 0 });
   component.unmount();

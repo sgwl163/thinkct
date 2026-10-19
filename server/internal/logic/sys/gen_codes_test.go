@@ -6,10 +6,63 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/gogf/gf/v2/frame/g"
+
+	"hotgo/internal/consts"
 	"hotgo/internal/model"
 	"hotgo/internal/model/entity"
+	"hotgo/internal/model/input/sysin"
 )
+
+func disableGenCodesFileLogs(t *testing.T) {
+	t.Helper()
+	logger := g.Log()
+	original := logger.GetConfig()
+	config := original
+	config.Path = ""
+	if err := logger.SetConfig(config); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := logger.SetConfig(original); err != nil {
+			t.Error(err)
+		}
+	})
+}
+
+// 实际发布入口应跳过相同内容，避免无意义的写入触发开发服务器反复重载。
+func TestPublishBuildPreviewSkipsUnchangedFiles(t *testing.T) {
+	disableGenCodesFileLogs(t)
+	path := filepath.Join(t.TempDir(), "index.vue")
+	const content = "unchanged generated content"
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+	if err := os.Chtimes(path, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview := &sysin.GenCodesPreviewModel{Views: map[string]*sysin.GenFile{
+		"web.index.vue": {Path: path, Content: "\n  " + content + "\n", Meth: consts.GenCodesBuildMethCover},
+	}}
+	noop := func(context.Context) error { return nil }
+	if err = NewSysGenCodes().publishBuildPreview(context.Background(), 52, preview, noop, noop); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !before.ModTime().Equal(after.ModTime()) {
+		t.Fatalf("unchanged file was rewritten: before=%v after=%v", before.ModTime(), after.ModTime())
+	}
+}
 
 func TestRefreshBuildServices(t *testing.T) {
 	for _, addon := range []bool{false, true} {

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
@@ -91,32 +92,46 @@ func (c *genCodesSessionConn) ExecContext(ctx context.Context, query string, arg
 		value := gconv.Int64(arg.Value)
 		if value >= 1 && value <= 4 {
 			c.pending = &value
+			if value == c.store.status {
+				return driver.RowsAffected(0), nil
+			}
 			return driver.RowsAffected(1), nil
 		}
 	}
 	return nil, errors.New("missing status")
 }
-func (c *genCodesSessionConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+func (c *genCodesSessionConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
 	status := c.store.status
 	if c.pending != nil {
 		status = *c.pending
 	}
-	return &genCodesSessionRows{status: status}, nil
+	fields := strings.SplitN(strings.ToLower(query), "from", 2)[0]
+	return &genCodesSessionRows{status: status, idOnly: !strings.Contains(fields, "status")}, nil
 }
 
 type genCodesSessionRows struct {
 	status int64
+	idOnly bool
 	read   bool
 }
 
-func (*genCodesSessionRows) Columns() []string { return []string{"status"} }
-func (*genCodesSessionRows) Close() error      { return nil }
+func (r *genCodesSessionRows) Columns() []string {
+	if r.idOnly {
+		return []string{"id"}
+	}
+	return []string{"status"}
+}
+func (*genCodesSessionRows) Close() error { return nil }
 func (r *genCodesSessionRows) Next(values []driver.Value) error {
 	if r.read {
 		return io.EOF
 	}
 	r.read = true
-	values[0] = r.status
+	if r.idOnly {
+		values[0] = int64(56)
+	} else {
+		values[0] = r.status
+	}
 	return nil
 }
 
@@ -145,6 +160,7 @@ func TestGenCodesStatusSurvivesConnectionReplacement(t *testing.T) {
 		return
 	}
 	t.Chdir(t.TempDir())
+	disableGenCodesFileLogs(t)
 	const driverName = "gencodes_session_test"
 	if err := gdb.Register(driverName, &genCodesSessionDriver{}); err != nil {
 		t.Fatal(err)
@@ -187,7 +203,7 @@ func TestGenCodesStatusSurvivesConnectionReplacement(t *testing.T) {
 			"web.index.vue": {Path: codePath, Content: "generated", Meth: consts.GenCodesBuildMethCreate},
 			"source.sql":    {Path: sqlPath, Content: "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\nSET AUTOCOMMIT = 0;\nSTART TRANSACTION;\nINSERT INTO menus VALUES(NULL);\nCOMMIT;", Meth: consts.GenCodesBuildMethCreate},
 		}}
-		if err := service.publishBuildPreview(ctx, preview, func(context.Context) error {
+		if err := service.publishBuildPreview(ctx, 56, preview, func(context.Context) error {
 			if _, err := os.Stat(codePath); !os.IsNotExist(err) {
 				t.Error("code written before DAO step")
 			}
@@ -205,6 +221,26 @@ func TestGenCodesStatusSurvivesConnectionReplacement(t *testing.T) {
 		}
 		if store.menus != 1 {
 			t.Fatalf("menu transaction not committed: %+v", store)
+		}
+		// 再次覆盖同一份菜单 SQL 时仍应导入菜单，但不重写相同文件。
+		oldTime := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+		if err := os.Chtimes(sqlPath, oldTime, oldTime); err != nil {
+			t.Fatal(err)
+		}
+		before, err := os.Stat(sqlPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		noop := func(context.Context) error { return nil }
+		if err = service.publishBuildPreview(ctx, 56, preview, noop, noop); err != nil {
+			t.Fatal(err)
+		}
+		after, err := os.Stat(sqlPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !before.ModTime().Equal(after.ModTime()) || store.menus != 2 {
+			t.Fatalf("unchanged SQL rewritten or menu import skipped: before=%v after=%v menus=%d", before.ModTime(), after.ModTime(), store.menus)
 		}
 		if err := service.Status(ctx, &sysin.GenCodesStatusInp{Id: 56, Status: consts.GenCodesStatusOk}); err != nil {
 			t.Fatal(err)
@@ -234,7 +270,7 @@ func TestGenCodesStatusSurvivesConnectionReplacement(t *testing.T) {
 				"web.edit.vue":  {Path: skippedPath, Content: "wrong overwrite", Meth: consts.GenCodesBuildMethSkip},
 				"source.sql":    {Path: sqlPath, Content: "INSERT INTO menus VALUES(NULL);\nCOMMIT;\nFAIL;", Meth: consts.GenCodesBuildMethCreate},
 			}}
-			err := NewSysGenCodes().publishBuildPreview(context.Background(), preview, func(context.Context) error { return nil }, func(context.Context) error {
+			err := NewSysGenCodes().publishBuildPreview(context.Background(), 56, preview, func(context.Context) error { return nil }, func(context.Context) error {
 				if failService {
 					return errors.New("service publish failed")
 				}

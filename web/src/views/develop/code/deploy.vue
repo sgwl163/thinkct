@@ -208,23 +208,34 @@
     buildMessage.value = tmp.buildMessage || '';
   }
 
+  function syncBuildInfo(result) {
+    // 状态核对不替换可编辑配置，避免重建字段表、关联表和基本信息选项。
+    Object.assign(genInfo.value, {
+      status: result.status,
+      updatedAt: result.updatedAt,
+      building: result.building,
+      buildSucceeded: result.buildSucceeded,
+      buildFiles: result.buildFiles,
+      buildStatusLabel: result.buildStatusLabel,
+      buildMessage: result.buildMessage || '',
+    });
+    buildMessage.value = result.buildMessage || '';
+  }
+
   watch(
-    genInfo,
-    (newVal, _oldVal) => {
-      if (newVal.genType >= 10 && newVal.genType < 20) {
+    [() => genInfo.value.genType, () => genInfo.value.options?.join],
+    ([genType, join]) => {
+      if (genType >= 10 && genType < 20) {
         handleAdd('主表字段');
       } else {
         handleClose('主表字段');
       }
 
-      if (newVal && newVal.options && newVal.options.join !== undefined) {
+      if (join !== undefined) {
         slavePanels.value = [];
-        for (let i = 0; i < newVal.options.join.length; i++) {
-          if (newVal.options.join[i]?.alias) {
-            handleSlaveAdd(
-              '关联表[ ' + newVal.options.join[i].alias + ' ]',
-              newVal.options.join[i]
-            );
+        for (let i = 0; i < join.length; i++) {
+          if (join[i]?.alias) {
+            handleSlaveAdd('关联表[ ' + join[i].alias + ' ]', join[i]);
           }
         }
       }
@@ -307,15 +318,14 @@
         const detail = result.message || '生成未完成，请查看后台日志';
         message.error(detail);
         try {
-          applyGenInfo(await View({ id: genId }, { isShowErrorMessage: false }));
+          syncBuildInfo(await View({ id: genId }, { isShowErrorMessage: false }));
         } catch {
           // 服务重启时暂时无法刷新详情，仍保留后台已返回的本次生成错误。
         }
         buildMessage.value = detail;
         return;
       }
-      buildSuccessNotify();
-      // 已确认生成成功；详情查询只是同步文件和状态，重启期间失败应继续核对。
+      // 详情核对后再提示完成，避免成功响应与后台状态矛盾时误导用户。
       await waitForBuildResult(false, '', true);
     } catch (error: any) {
       // 网络中断不能证明生成失败；服务恢复后查询后台真实状态。
@@ -350,7 +360,9 @@
     if (checkingBuild) return;
     checkingBuild = true;
     formBtnLoading.value = true;
-    const deadline = Date.now() + 10 * 60 * 1000;
+    // 生成请求已明确成功时只做短时详情同步；未确认的任务仍按生成超时核对。
+    const deadline = Date.now() + (confirmedSuccess ? 30 * 1000 : 10 * 60 * 1000);
+    let observedResult = false;
     if (confirmedSuccess) {
       buildMessage.value = '代码已生成，正在等待后端重新加载并同步文件状态，请勿重复提交。';
     }
@@ -361,24 +373,36 @@
         try {
           const result = await View({ id: genId }, { isShowErrorMessage: false });
           if (disposed) return;
+          observedResult = true;
+          syncBuildInfo(result);
           if (result.building) {
             observedRunning = true;
-            buildMessage.value = result.buildMessage;
+            buildMessage.value =
+              result.buildMessage || '后台仍有生成任务正在执行，请等待结果核对。';
             continue;
           }
-          applyGenInfo(result);
           const statusOption = selectList.value.status.find((item) => item.value === result.status);
           if (result.buildSucceeded) {
-            if (observedRunning && !confirmedSuccess) {
+            if (confirmedSuccess) {
+              buildSuccessNotify();
+            } else if (observedRunning) {
               message.success(statusOption?.label || '生成已完成，请返回列表查看结果');
-            } else if (!confirmedSuccess) {
+            } else {
               // 没有观察到本次任务执行，后台的旧成功状态不能证明本次请求成功。
-              buildMessage.value = `${requestError}；后台记录为${statusOption?.label || '已完成'}，本次请求结果未确认，请核对文件。`;
+              buildMessage.value = [
+                requestError,
+                `后台记录为${statusOption?.label || '已完成'}，本次请求结果未确认，请核对文件。`,
+              ]
+                .filter(Boolean)
+                .join('；');
               message.warning(buildMessage.value);
             }
           } else {
-            buildMessage.value = [requestError, result.buildMessage].filter(Boolean).join('；');
-            message.warning(buildMessage.value || statusOption?.label || '请返回列表核对生成结果');
+            buildMessage.value = confirmedSuccess
+              ? `生成接口已返回成功，但后台记录尚未确认，请核对文件和后台日志${result.buildMessage ? `：${result.buildMessage}` : '。'}`
+              : [requestError, result.buildMessage].filter(Boolean).join('；') ||
+                '暂时无法确认生成结果，请返回列表核对。';
+            message.warning(buildMessage.value);
           }
           return;
         } catch {
@@ -388,9 +412,15 @@
         }
       }
       if (!disposed) {
-        buildMessage.value = confirmedSuccess
-          ? '代码已生成，但暂时无法同步详情，请待后端恢复后刷新列表，无需重复提交生成。'
-          : '暂时无法确认生成结果，请待后端恢复后刷新列表核对。已有文件不会因此被删除。';
+        if (confirmedSuccess && !observedResult) {
+          buildMessage.value =
+            '代码已生成，但暂时无法同步详情，请待后端恢复后刷新列表，无需重复提交生成。';
+          buildSuccessNotify();
+        } else {
+          buildMessage.value = confirmedSuccess
+            ? '生成接口已返回成功，但后台仍有生成任务未确认结束，请稍后刷新列表核对，勿重复提交。'
+            : '暂时无法确认生成结果，请待后端恢复后刷新列表核对。已有文件不会因此被删除。';
+        }
       }
     } finally {
       checkingBuild = false;

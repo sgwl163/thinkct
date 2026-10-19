@@ -1,6 +1,10 @@
+import { computed, h, ref } from 'vue';
+import { NTag } from 'naive-ui';
+import type { FormRules } from 'naive-ui';
 import { cloneDeep } from 'lodash-es';
-import { FormSchema } from '@/components/Form';
-import { defRangeShortcuts } from '@/utils/dateUtil';
+import type { FormSchema } from '@/components/Form';
+import type { BasicColumn } from '@/components/Table';
+import { defRangeShortcuts, formatToDateTime } from '@/utils/dateUtil';
 import { validate } from '@/utils/validateUtil';
 import { renderOptionTag } from '@/utils';
 import { useDictStore } from '@/store/modules/dict';
@@ -9,21 +13,21 @@ const dict = useDictStore();
 
 export class State {
   public id = 0; // ID
-  public userId = 0; // 用户ID
-  public productId = 0; // 产品ID
-  public name = ''; // 名称
-  public host = ''; // 域名
+  public userId: number | null = null; // 用户ID
+  public productId: number | null = null; // 产品ID
+  public name = ''; // 授权名称
+  public host = ''; // 授权域名
   public ip = '127.0.0.1'; // IP
   public qq = ''; // QQ
-  public phone = ''; // 电话
+  public phone = ''; // 联系电话
   public syskey = ''; // 授权码
-  public versionId = '1.0.0'; // 版本
-  public authMode = '0'; // 验证方式:0=单域名验证,1=IP双重验证
-  public authDomain = '0'; // 验证域名:0=当前单域名方式,1=顶级泛域名方式
-  public views = 1; // 浏览量
-  public status = 1; // 状态:1=启用,0=禁用
+  public versionId = '1.0.0'; // 版本号（字符串，不是版本记录ID）
+  public authMode = '0'; // 验证方式
+  public authDomain = '0'; // 域名范围
+  public views = 1; // 浏览量，仅在详情展示
+  public status = 1; // 状态，使用系统启用/禁用字典
   public createdAt = ''; // 创建时间
-  public updatedAt = ''; // 修改时间
+  public updatedAt = ''; // 更新时间
   public expiredAt = ''; // 到期时间
 
   constructor(state?: Partial<State>) {
@@ -43,25 +47,75 @@ export function newState(state: State | Record<string, any> | null): State {
   return new State();
 }
 
-// 表单验证规则
-export const rules = {
+export const productOptions = computed(() => dict.getOptionUnRef('AppAuthProductOptions'));
+export const userOptions = computed(() => dict.getOptionUnRef('AppAuthUserOptions'));
+export const authModeOptions = computed(() => dict.getOptionUnRef('AppAuthModeOptions'));
+export const authDomainOptions = computed(() => dict.getOptionUnRef('AppAuthDomainOptions'));
+export const statusOptions = computed(() => dict.getOptionUnRef('sys_normal_disable'));
+
+export function requiresIp(authMode: string): boolean {
+  return dict.getExtra('AppAuthModeOptions', authMode)?.requireIp === true;
+}
+
+export function getProductLabel(productId: number | null): string {
+  return (
+    dict.getLabel('AppAuthProductOptions', productId) || (productId ? `产品 #${productId}` : '-')
+  );
+}
+
+export function getUserLabel(userId: number | null): string {
+  return dict.getLabel('AppAuthUserOptions', userId) || '-';
+}
+
+// 名称、域名保留文本显示，产品、用户、分类和版本在列表与详情中使用标签。
+export function renderProductTag(productId: number | null) {
+  if (!productId) return '-';
+  return h(
+    NTag,
+    { type: dict.getType('AppAuthProductOptions', productId), size: 'small', bordered: false },
+    { default: () => getProductLabel(productId) }
+  );
+}
+
+export function renderUserTag(userId: number | null) {
+  if (!userId) return '-';
+  return h(
+    NTag,
+    { type: dict.getType('AppAuthUserOptions', userId), size: 'small', bordered: false },
+    { default: () => getUserLabel(userId) }
+  );
+}
+
+export function renderVersionTag(version: string) {
+  if (!version) return '-';
+  return h(NTag, { type: 'default', size: 'small', bordered: false }, { default: () => version });
+}
+
+export function formatDateTime(value: string): string {
+  return value ? formatToDateTime(value) : '-';
+}
+
+// 保持字段与后端校验一致，关联ID不能以0提交。
+export const rules: FormRules = {
   userId: {
     required: true,
-    trigger: ['blur', 'input'],
+    trigger: ['blur', 'change'],
     type: 'number',
-    message: '请输入用户ID',
+    min: 1,
+    message: '请选择所属用户',
   },
   productId: {
     required: true,
-    trigger: ['blur', 'input'],
+    trigger: ['blur', 'change'],
     type: 'number',
-    message: '请输入产品ID',
+    min: 1,
+    message: '请选择所属产品',
   },
   name: {
     required: true,
     trigger: ['blur', 'input'],
     type: 'string',
-    message: '请输入名称',
+    message: '请输入授权名称',
   },
   qq: {
     required: true,
@@ -73,35 +127,35 @@ export const rules = {
     required: true,
     trigger: ['blur', 'input'],
     type: 'string',
-    message: '请输入电话',
+    message: '请输入联系电话',
   },
   versionId: {
     required: true,
     trigger: ['blur', 'input'],
     type: 'string',
-    message: '请输入版本',
+    message: '请输入版本号',
   },
   authMode: {
     required: true,
-    trigger: ['blur', 'input'],
+    trigger: ['blur', 'change'],
     type: 'string',
-    message: '请输入验证方式:0=单域名验证,1=IP双重验证',
+    message: '请选择验证方式',
   },
   authDomain: {
     required: true,
-    trigger: ['blur', 'input'],
+    trigger: ['blur', 'change'],
     type: 'string',
-    message: '请输入验证域名:0=当前单域名方式,1=顶级泛域名方式',
+    message: '请选择域名范围',
   },
   status: {
     required: true,
-    trigger: ['blur', 'input'],
+    trigger: ['blur', 'change'],
     type: 'number',
-    message: '请输入状态:1=启用,0=禁用',
+    message: '请选择状态',
   },
 };
 
-// 表格搜索表单
+// 只展示现有列表接口支持的筛选项。
 export const schemas = ref<FormSchema[]>([
   {
     field: 'id',
@@ -109,22 +163,21 @@ export const schemas = ref<FormSchema[]>([
     label: 'ID',
     componentProps: {
       placeholder: '请输入ID',
-      onUpdateValue: (e: any) => {
-        console.log(e);
-      },
+      min: 1,
+      precision: 0,
+      clearable: true,
+      showButton: false,
     },
   },
   {
     field: 'status',
     component: 'NSelect',
-    label: '状态:1=启用,0=禁用',
+    label: '状态',
     defaultValue: null,
     componentProps: {
-      placeholder: '请选择状态:1=启用,0=禁用',
-      options: dict.getOption('sys_normal_disable'),
-      onUpdateValue: (e: any) => {
-        console.log(e);
-      },
+      placeholder: '请选择状态',
+      clearable: true,
+      options: statusOptions,
     },
   },
   {
@@ -135,98 +188,87 @@ export const schemas = ref<FormSchema[]>([
       type: 'datetimerange',
       clearable: true,
       shortcuts: defRangeShortcuts(),
-      onUpdateValue: (e: any) => {
-        console.log(e);
-      },
     },
   },
 ]);
 
-// 表格列
-export const columns = [
+// 列表保留授权识别、验证策略、创建/更新及到期时间，敏感和辅助字段放到详情。
+export const columns: BasicColumn[] = [
   {
     title: 'ID',
     key: 'id',
     align: 'left',
-    width: -1,
+    width: 80,
   },
   {
-    title: '用户ID',
-    key: 'userId',
-    align: 'left',
-    width: -1,
-  },
-  {
-    title: '产品ID',
-    key: 'productId',
-    align: 'left',
-    width: -1,
-  },
-  {
-    title: '名称',
+    title: '授权名称',
     key: 'name',
     align: 'left',
-    width: -1,
+    width: 160,
+    ellipsis: { tooltip: true },
   },
   {
-    title: '域名',
+    title: '所属产品',
+    key: 'productId',
+    align: 'left',
+    width: 160,
+    ellipsis: { tooltip: true },
+    render(row: State) {
+      return renderProductTag(row.productId);
+    },
+  },
+  {
+    title: '所属用户',
+    key: 'userId',
+    align: 'left',
+    width: 200,
+    ellipsis: { tooltip: true },
+    render(row: State) {
+      return renderUserTag(row.userId);
+    },
+  },
+  {
+    title: '授权域名',
     key: 'host',
     align: 'left',
-    width: -1,
+    width: 180,
+    ellipsis: { tooltip: true },
+    render(row: State) {
+      return row.host || '-';
+    },
   },
   {
-    title: 'IP',
-    key: 'ip',
-    align: 'left',
-    width: -1,
-  },
-  {
-    title: 'QQ',
-    key: 'qq',
-    align: 'left',
-    width: -1,
-  },
-  {
-    title: '电话',
-    key: 'phone',
-    align: 'left',
-    width: -1,
-  },
-  {
-    title: '授权码',
-    key: 'syskey',
-    align: 'left',
-    width: -1,
-  },
-  {
-    title: '版本',
+    title: '版本号',
     key: 'versionId',
     align: 'left',
-    width: -1,
+    width: 100,
+    render(row: State) {
+      return renderVersionTag(row.versionId);
+    },
   },
   {
-    title: '验证方式:0=单域名验证,1=IP双重验证',
+    title: '验证方式',
     key: 'authMode',
     align: 'left',
-    width: -1,
+    width: 130,
+    render(row: State) {
+      return renderOptionTag('AppAuthModeOptions', row.authMode);
+    },
   },
   {
-    title: '验证域名:0=当前单域名方式,1=顶级泛域名方式',
+    title: '域名范围',
     key: 'authDomain',
     align: 'left',
-    width: -1,
+    width: 130,
+    render(row: State) {
+      return renderOptionTag('AppAuthDomainOptions', row.authDomain);
+    },
   },
   {
-    title: '浏览量',
-    key: 'views',
-    align: 'left',
-    width: -1,
-  },
-  {
-    title: '状态:1=启用,0=禁用',
+    title: '状态',
     key: 'status',
     align: 'left',
-    width: -1,
+    width: 90,
     render(row: State) {
       return renderOptionTag('sys_normal_disable', row.status);
     },
@@ -235,23 +277,37 @@ export const columns = [
     title: '创建时间',
     key: 'createdAt',
     align: 'left',
-    width: -1,
+    width: 180,
+    render(row: State) {
+      return formatDateTime(row.createdAt);
+    },
   },
   {
-    title: '修改时间',
+    title: '更新时间',
     key: 'updatedAt',
     align: 'left',
-    width: -1,
+    width: 180,
+    render(row: State) {
+      return formatDateTime(row.updatedAt);
+    },
   },
   {
     title: '到期时间',
     key: 'expiredAt',
     align: 'left',
-    width: -1,
+    width: 180,
+    render(row: State) {
+      return formatDateTime(row.expiredAt);
+    },
   },
 ];
 
-// 加载字典数据选项
 export function loadOptions() {
-  dict.loadOptions(['sys_normal_disable']);
+  dict.loadOptions([
+    'sys_normal_disable',
+    'AppAuthProductOptions',
+    'AppAuthUserOptions',
+    'AppAuthModeOptions',
+    'AppAuthDomainOptions',
+  ]);
 }

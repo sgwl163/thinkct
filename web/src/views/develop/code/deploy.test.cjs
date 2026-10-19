@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const ts = require('typescript');
 
 // 执行页面实际的 script setup，隔离网络、弹窗和定时器，不连接真实后端。
-function loadPage({ build, view, selects = async () => ({ status: [] }) }) {
+function loadPage({ build, view, selects = async () => ({ status: [] }), reactive = false }) {
   const source = fs.readFileSync(path.join(__dirname, 'deploy.vue'), 'utf8');
   const script = source.match(/<script lang="ts" setup>([\s\S]*?)<\/script>/)[1];
   const calls = { success: [], warning: [], error: [], notifications: [] };
@@ -14,12 +14,13 @@ function loadPage({ build, view, selects = async () => ({ status: [] }) }) {
   let unmount;
   let mount;
   let now = 0;
+  const vue = reactive ? require('vue') : null;
   const modules = {
     vue: {
-      ref: (value) => ({ value }),
+      ref: vue?.ref || ((value) => ({ value })),
       onMounted: (callback) => (mount = callback),
       onBeforeUnmount: (callback) => (unmount = callback),
-      watch() {},
+      watch: vue?.watch || (() => {}),
     },
     'vue-router': {
       useRouter: () => ({ currentRoute: { value: { params: { id: 52 } } } }),
@@ -65,7 +66,7 @@ function loadPage({ build, view, selects = async () => ({ status: [] }) }) {
   }).outputText;
   vm.runInNewContext(
     compiled +
-      '\nexports.page = { submitBuild, waitForBuildResult, buildMessage, genInfo, formBtnLoading, show };',
+      '\nexports.page = { submitBuild, waitForBuildResult, buildMessage, genInfo, formBtnLoading, show, slavePanels };',
     context
   );
   return {
@@ -260,6 +261,85 @@ test('已确认生成成功但服务持续不可用时，不把详情同步超�
   assert.equal(calls.error.length, 0);
   assert.ok(page.buildMessage.value.startsWith('代码已生成'));
   assert.ok(page.buildMessage.value.includes('无需重复提交'));
+  assert.equal(page.formBtnLoading.value, false);
+});
+
+test('确认成功后的详情同步有短时限，不让提交按钮继续加载十分钟', async () => {
+  let reads = 0;
+  const { submit, page } = loadPage({
+    build: async () => ({ code: 0, message: '操作成功' }),
+    view: async () => {
+      reads++;
+      throw new Error('服务不可用');
+    },
+  });
+  await submit();
+  assert.ok(reads <= 20, `生成已成功却仍核对了 ${reads} 次`);
+  assert.equal(page.formBtnLoading.value, false);
+  assert.ok(page.buildMessage.value.includes('无需重复提交'));
+});
+
+test('状态核对仅同步结果字段，保留配置对象和本地编辑内容', async () => {
+  const { submit, page } = loadPage({
+    build: async () => ({ code: 0, message: '操作成功' }),
+    view: async () => ({ ...completed(), varName: 'ServerName', options: { join: [] } }),
+  });
+  const original = page.genInfo.value;
+  original.varName = 'LocalName';
+  original.options = { localSetting: true };
+  await submit();
+  assert.equal(page.genInfo.value, original, '核对状态替换了整份配置，导致子组件重复初始化');
+  assert.equal(page.genInfo.value.varName, 'LocalName');
+  assert.equal(page.genInfo.value.options.localSetting, true);
+  assert.equal(page.genInfo.value.buildFiles, 11);
+  assert.equal(page.genInfo.value.buildSucceeded, true);
+});
+
+test('成功响应后的矛盾详情明确提示待核对，不静默显示空提示', async () => {
+  const { submit, calls, page } = loadPage({
+    build: async () => ({ code: 0, message: '操作成功' }),
+    view: async () => ({ ...completed(), status: 4, buildSucceeded: false }),
+  });
+  await submit();
+  assert.ok(page.buildMessage.value.includes('核对'));
+  assert.equal(calls.notifications.length, 0, '后台结果矛盾时仍显示代码生成完成');
+});
+
+test('状态核对不重建关联表页签，实际修改关联配置时仍同步页签', async () => {
+  const { nextTick, watch } = require('vue');
+  const { submit, page } = loadPage({
+    build: async () => ({ code: 0, message: '操作成功' }),
+    view: async () => completed(),
+    reactive: true,
+  });
+  page.genInfo.value.options.join = [{ alias: 'detail', uuid: 'detail-id' }];
+  await nextTick();
+  let panelUpdates = 0;
+  const stop = watch(page.slavePanels, () => panelUpdates++);
+  await submit();
+  await nextTick();
+  assert.equal(panelUpdates, 0, '仅更新生成状态就重建了关联表页签');
+  page.genInfo.value.options.join[0].alias = 'renamed';
+  await nextTick();
+  assert.equal(panelUpdates, 1, '实际关联配置修改没有更新页签');
+  assert.equal(page.slavePanels.value[0], '关联表[ renamed ]');
+  stop();
+});
+
+test('成功响应后仍持续观察到运行中的任务，短时核对结束时保留待核对提示', async () => {
+  let reads = 0;
+  const { submit, calls, page } = loadPage({
+    build: async () => ({ code: 0, message: '操作成功' }),
+    view: async () => {
+      reads++;
+      return { ...completed(), status: 4, building: true, buildSucceeded: false };
+    },
+  });
+  await submit();
+  assert.ok(reads <= 20);
+  assert.equal(calls.notifications.length, 0, '仍在运行时误报本次生成完成');
+  assert.equal(page.genInfo.value.building, true);
+  assert.ok(page.buildMessage.value.includes('核对'));
   assert.equal(page.formBtnLoading.value, false);
 });
 

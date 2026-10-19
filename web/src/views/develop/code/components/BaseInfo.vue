@@ -448,10 +448,8 @@
     selectList: selectListObj,
   });
 
-  watch(
-    () => [props.value.id, props.value.dbName],
-    () => void initialize()
-  );
+  // 分别比较字段值，避免生成结果刷新替换 value 时重复初始化和打开遮罩。
+  watch([() => props.value.id, () => props.value.dbName], () => void initialize());
 
   const formValue = computed({
     get() {

@@ -12,7 +12,10 @@ import (
 	"hotgo/addons/appAuth/model/input/sysin"
 	"hotgo/addons/appAuth/service"
 	"hotgo/internal/dao"
+	"hotgo/internal/library/dict"
 	"hotgo/internal/library/hgorm/handler"
+	"hotgo/internal/model"
+	"hotgo/internal/model/entity"
 	"hotgo/internal/model/input/form"
 	"hotgo/utility/convert"
 	"hotgo/utility/excel"
@@ -32,6 +35,31 @@ func NewSysAppProducts() *sSysAppProducts {
 
 func init() {
 	service.RegisterSysAppProducts(NewSysAppProducts())
+	dict.RegisterFunc("AppAuthProductOptions", "应用授权产品选项", service.SysAppProducts().Option)
+}
+
+// Option 获取应用授权产品选项，仅提供选择所需的产品标识和名称。
+func (s *sSysAppProducts) Option(ctx context.Context) (opts []*model.Option, err error) {
+	var products []*entity.AppProducts
+	cols := dao.AppProducts.Columns()
+	if err = s.Model(ctx).Fields(cols.Id, cols.Name).
+		OrderDesc(cols.Id).Scan(&products); err != nil {
+		return nil, gerror.Wrap(err, "获取应用授权产品选项失败，请稍后重试")
+	}
+
+	opts = make([]*model.Option, 0, len(products))
+	for _, product := range products {
+		opts = append(opts, appAuthProductOption(product))
+	}
+	return
+}
+
+func appAuthProductOption(product *entity.AppProducts) *model.Option {
+	label := product.Name
+	if label == "" {
+		label = fmt.Sprintf("产品 #%d", product.Id)
+	}
+	return dict.GenDefaultOption(product.Id, label)
 }
 
 // Model 产品管理ORM模型

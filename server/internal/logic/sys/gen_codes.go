@@ -7,6 +7,7 @@ package sys
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"hotgo/internal/consts"
 	"hotgo/internal/dao"
@@ -131,8 +132,7 @@ func (s *sSysGenCodes) DeleteBuild(ctx context.Context, in *sysin.GenCodesDelete
 		return gerror.Wrap(err, "更新业务服务失败")
 	}
 
-	if _, err = dao.SysGenCodes.Ctx(ctx).Where(dao.SysGenCodes.Columns().Id, record.Id).
-		Data(dao.SysGenCodes.Columns().Status, consts.GenCodesStatusWait).Update(); err != nil {
+	if err = s.Status(ctx, &sysin.GenCodesStatusInp{Id: record.Id, Status: consts.GenCodesStatusWait}); err != nil {
 		return gerror.Wrap(err, "更新生成状态失败")
 	}
 	return
@@ -211,6 +211,10 @@ func (s *sSysGenCodes) getBuildFiles(ctx context.Context, record *entity.SysGenC
 func (s *sSysGenCodes) deleteBuildMenus(ctx context.Context, name string) (err error) {
 	var root entity.AdminMenu
 	if err = dao.AdminMenu.Ctx(ctx).Where(dao.AdminMenu.Columns().Name, name).Scan(&root); err != nil {
+		// 未导入过菜单或上次清理已删除菜单时，允许继续清理文件和刷新服务。
+		if gerror.Is(err, sql.ErrNoRows) {
+			return nil
+		}
 		return gerror.Wrap(err, "查询生成菜单失败")
 	}
 	if root.Id == 0 {
@@ -329,9 +333,27 @@ func (s *sSysGenCodes) Status(ctx context.Context, in *sysin.GenCodesStatusInp) 
 
 	// 即使复用了 AUTOCOMMIT=0 的旧连接，也必须显式提交；不能仅凭 UPDATE 成功判断落库。
 	return dao.SysGenCodes.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
-		_, err := dao.SysGenCodes.Ctx(ctx).Where(dao.SysGenCodes.Columns().Id, in.Id).
+		result, err := dao.SysGenCodes.Ctx(ctx).Where(dao.SysGenCodes.Columns().Id, in.Id).
 			Data(dao.SysGenCodes.Columns().Status, in.Status).Update()
-		return err
+		if err != nil {
+			return gerror.Wrap(err, "保存生成状态失败")
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return gerror.Wrap(err, "读取生成状态更新结果失败")
+		}
+		if affected == 0 {
+			// MySQL 同值更新也可能影响 0 行，不能直接将其判定为记录不存在。
+			record, queryErr := dao.SysGenCodes.Ctx(ctx).Fields(dao.SysGenCodes.Columns().Id).
+				Where(dao.SysGenCodes.Columns().Id, in.Id).One()
+			if queryErr != nil {
+				return gerror.Wrap(queryErr, "核对生成配置失败")
+			}
+			if len(record) == 0 {
+				return gerror.New("生成配置不存在，无法保存生成状态")
+			}
+		}
+		return nil
 	})
 }
 

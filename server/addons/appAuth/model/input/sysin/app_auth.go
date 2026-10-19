@@ -8,7 +8,9 @@ package sysin
 
 import (
 	"context"
+	ac "hotgo/addons/appAuth/consts"
 	"hotgo/internal/consts"
+	"hotgo/internal/library/dict"
 	"hotgo/internal/model/entity"
 	"hotgo/internal/model/input/form"
 	"hotgo/utility/validate"
@@ -29,10 +31,9 @@ type AppAuthUpdateFields struct {
 	Phone      string      `json:"phone"      dc:"电话"`
 	Syskey     string      `json:"syskey"     dc:"授权码"`
 	VersionId  string      `json:"versionId"  dc:"版本"`
-	AuthMode   string      `json:"authMode"   dc:"验证方式:0=单域名验证,1=IP双重验证"`
-	AuthDomain string      `json:"authDomain" dc:"验证域名:0=当前单域名方式,1=顶级泛域名方式"`
-	Views      int         `json:"views"      dc:"浏览量"`
-	Status     int         `json:"status"     dc:"状态:1=启用,0=禁用"`
+	AuthMode   string      `json:"authMode"   dc:"验证方式"`
+	AuthDomain string      `json:"authDomain" dc:"域名范围"`
+	Status     int         `json:"status"     dc:"状态"`
 	ExpiredAt  *gtime.Time `json:"expiredAt"  dc:"到期时间"`
 }
 
@@ -84,19 +85,20 @@ func (in *AppAuthEditInp) Filter(ctx context.Context) (err error) {
 	if err := g.Validator().Rules("required").Data(in.VersionId).Messages("版本不能为空").Run(ctx); err != nil {
 		return err.Current()
 	}
-	// 验证验证方式:0=单域名验证,1=IP双重验证
-	if err := g.Validator().Rules("required").Data(in.AuthMode).Messages("验证方式:0=单域名验证,1=IP双重验证不能为空").Run(ctx); err != nil {
-		return err.Current()
+	// 验证方式和域名范围由后端字典统一维护。
+	if !dict.HasOptionKey(ac.AppAuthModeOptions, in.AuthMode) {
+		return gerror.New("请选择有效的验证方式")
 	}
-	// 验证验证域名:0=当前单域名方式,1=顶级泛域名方式
-	if err := g.Validator().Rules("required").Data(in.AuthDomain).Messages("验证域名:0=当前单域名方式,1=顶级泛域名方式不能为空").Run(ctx); err != nil {
-		return err.Current()
+	if !dict.HasOptionKey(ac.AppAuthDomainOptions, in.AuthDomain) {
+		return gerror.New("请选择有效的域名范围")
 	}
-	// 验证状态:1=启用,0=禁用
-	if err := g.Validator().Rules("required").Data(in.Status).Messages("状态:1=启用,0=禁用不能为空").Run(ctx); err != nil {
-		return err.Current()
+	if in.AuthMode == ac.AppAuthModeDomainIP {
+		if err := g.Validator().Rules("required").Data(in.Ip).Messages("IP双重验证时IP不能为空").Run(ctx); err != nil {
+			return err.Current()
+		}
 	}
-	if err := g.Validator().Rules("in:1,2").Data(in.Status).Messages("状态:1=启用,0=禁用值不正确").Run(ctx); err != nil {
+	// 状态沿用系统启用/禁用字典。
+	if err := g.Validator().Rules("in:1,2").Data(in.Status).Messages("请选择有效的状态").Run(ctx); err != nil {
 		return err.Current()
 	}
 	return

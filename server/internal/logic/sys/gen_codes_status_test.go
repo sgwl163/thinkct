@@ -1,8 +1,10 @@
 package sys
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"os"
 	"os/exec"
@@ -12,8 +14,10 @@ import (
 
 	"github.com/gogf/gf/v2/container/gvar"
 	"github.com/gogf/gf/v2/database/gdb"
+	"github.com/gogf/gf/v2/encoding/gjson"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gcfg"
+	"github.com/gogf/gf/v2/os/glog"
 	"github.com/gogf/gf/v2/util/gconv"
 
 	"hotgo/internal/consts"
@@ -44,10 +48,22 @@ type genCodesStatusFixture struct {
 	record          map[string]any
 	updates         []map[string]any
 	failFinalStatus bool
+	menuQueryErr    error
+	statusQueryErr  error
+	unchangedRows   bool
 }
 
 func (d *genCodesStatusDriver) DoSelect(ctx context.Context, link gdb.Link, query string, args ...any) (gdb.Result, error) {
 	fixture := ctx.Value(genCodesUpdateKey{}).(*genCodesStatusFixture)
+	if strings.Contains(query, "admin_menu") {
+		return nil, fixture.menuQueryErr
+	}
+	if fixture.statusQueryErr != nil {
+		return nil, fixture.statusQueryErr
+	}
+	if fixture.record == nil {
+		return nil, nil
+	}
 	record := make(gdb.Record)
 	for key, value := range fixture.record {
 		record[key] = gvar.New(value)
@@ -69,8 +85,14 @@ func (d *genCodesStatusDriver) DoUpdate(ctx context.Context, link gdb.Link, tabl
 	if fixture.failFinalStatus && gconv.Int(update["status"]) == consts.GenCodesStatusFail {
 		return nil, errors.New("status storage unavailable")
 	}
+	if fixture.record == nil {
+		return driver.RowsAffected(0), nil
+	}
 	for key, value := range update {
 		fixture.record[key] = value
+	}
+	if fixture.unchangedRows {
+		return driver.RowsAffected(0), nil
 	}
 	return genCodesStatusResult{}, nil
 }
@@ -103,11 +125,7 @@ func TestGenCodesEditPreservesBuildStatus(t *testing.T) {
 	g.DB("default")
 	genCodesSessionPool = sql.OpenDB(genCodesSessionConnector{&genCodesSessionStore{}})
 	defer genCodesSessionPool.Close()
-	logConfig := g.Log().GetConfig()
-	logConfig.Path = ""
-	if err := g.Log().SetConfig(logConfig); err != nil {
-		t.Fatal(err)
-	}
+	disableGenCodesFileLogs(t)
 	newContext := func() (context.Context, *genCodesStatusFixture) {
 		fixture := &genCodesStatusFixture{record: map[string]any{"id": int64(52), "status": consts.GenCodesStatusOk, "gen_type": consts.GenCodesTypeQueue, "var_name": "AppLog"}}
 		return context.WithValue(context.Background(), genCodesUpdateKey{}, fixture), fixture
@@ -115,6 +133,151 @@ func TestGenCodesEditPreservesBuildStatus(t *testing.T) {
 	newInput := func() entity.SysGenCodes {
 		return entity.SysGenCodes{Id: 52, GenType: consts.GenCodesTypeQueue, VarName: "AppLog", Status: consts.GenCodesStatusWait}
 	}
+
+	t.Run("stage logs preserve errors and panic semantics", func(t *testing.T) {
+		logger := g.Log()
+		original := logger.GetConfig()
+		defer func() {
+			if err := logger.SetConfig(original); err != nil {
+				t.Error(err)
+			}
+		}()
+		var output bytes.Buffer
+		config := original
+		config.Path, config.Writer, config.StdoutPrint = "", &output, false
+		config.Level, config.Flags = glog.LEVEL_ALL, config.Flags&^glog.F_ASYNC
+		if err := logger.SetConfig(config); err != nil {
+			t.Fatal(err)
+		}
+		for _, scenario := range []string{"success", "failure", "panic"} {
+			output.Reset()
+			ctx, _ := newContext()
+			wantErr := errors.New("stage failure")
+			var stageErr error
+			panicErr := g.Try(ctx, func(ctx context.Context) {
+				stageErr = runBuildStage(ctx, 52, "test-stage", func(stageCtx context.Context) error {
+					if stageCtx != ctx {
+						t.Error("stage context was replaced")
+					}
+					switch scenario {
+					case "failure":
+						return wantErr
+					case "panic":
+						panic("stage panic")
+					}
+					return nil
+				})
+			})
+			if scenario == "failure" && stageErr != wantErr || scenario == "panic" && panicErr == nil || scenario == "success" && (stageErr != nil || panicErr != nil) {
+				t.Fatalf("stage changed outcome for %s: error=%v panic=%v", scenario, stageErr, panicErr)
+			}
+			text := output.String()
+			for _, value := range []string{"代码生成阶段开始", "代码生成阶段结束", "52", "test-stage", "elapsedMs", "succeeded"} {
+				if !strings.Contains(text, value) {
+					t.Errorf("stage %s log is missing %q: %s", scenario, value, text)
+				}
+			}
+		}
+	})
+
+	t.Run("missing status record is rejected", func(t *testing.T) {
+		ctx, fixture := newContext()
+		fixture.record = nil
+		err := NewSysGenCodes().Status(ctx, &sysin.GenCodesStatusInp{Id: 52, Status: consts.GenCodesStatusOk})
+		if err == nil || !strings.Contains(err.Error(), "生成配置不存在") {
+			t.Fatalf("missing record reported as saved: %v", err)
+		}
+	})
+	t.Run("unchanged status with zero affected rows succeeds", func(t *testing.T) {
+		ctx, fixture := newContext()
+		fixture.unchangedRows = true
+		if err := NewSysGenCodes().Status(ctx, &sysin.GenCodesStatusInp{Id: 52, Status: consts.GenCodesStatusOk}); err != nil {
+			t.Fatalf("same status treated as missing record: %v", err)
+		}
+	})
+	t.Run("status existence query errors are returned", func(t *testing.T) {
+		ctx, fixture := newContext()
+		fixture.unchangedRows = true
+		fixture.statusQueryErr = errors.New("status lookup unavailable")
+		if err := NewSysGenCodes().Status(ctx, &sysin.GenCodesStatusInp{Id: 52, Status: consts.GenCodesStatusOk}); err == nil {
+			t.Fatal("status lookup failure hidden")
+		}
+	})
+	t.Run("missing menu cleanup is retryable", func(t *testing.T) {
+		ctx, _ := newContext()
+		for attempt := 0; attempt < 2; attempt++ {
+			if err := NewSysGenCodes().deleteBuildMenus(ctx, "appLog"); err != nil {
+				t.Fatalf("absent menu prevents cleanup retry: %v", err)
+			}
+		}
+	})
+	t.Run("menu query errors are returned", func(t *testing.T) {
+		ctx, fixture := newContext()
+		fixture.menuQueryErr = errors.New("menu lookup unavailable")
+		if err := NewSysGenCodes().deleteBuildMenus(ctx, "appLog"); err == nil {
+			t.Fatal("real menu lookup failure hidden")
+		}
+	})
+	t.Run("cleanup can retry after service refresh fails", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		adapter, err := gcfg.NewAdapterContent(`{"hggen":{"application":{"crud":{"templates":[{
+			"apiPath":"generated/api", "inputPath":"generated/input", "controllerPath":"generated/controller",
+			"logicPath":"internal/logic/sys", "routerPath":"generated/router", "sqlPath":"generated/sql",
+			"webApiPath":"generated/web/api", "webViewsPath":"generated/web/views"
+		}]}}}}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		oldAdapter := g.Cfg().GetAdapter()
+		g.Cfg().SetAdapter(adapter)
+		defer g.Cfg().SetAdapter(oldAdapter)
+		ctx, fixture := newContext()
+		fixture.record["gen_type"] = consts.GenCodesTypeCurd
+		fixture.record["status"] = consts.GenCodesStatusFail
+		fixture.record["options"] = gjson.New(`{"autoOps":["genMenuPermissions"]}`)
+		service := NewSysGenCodes()
+		paths, _, err := service.getBuildFiles(ctx, &entity.SysGenCodes{VarName: "AppLog", Options: fixture.record["options"].(*gjson.Json)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, path := range paths {
+			if err = os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err = os.WriteFile(path, []byte("partial generated file"), 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// go.mod 暂缺，强制第一次在删除文件、清理缺失菜单之后刷新 service 失败。
+		if err = service.DeleteBuild(ctx, &sysin.GenCodesDeleteBuildInp{Id: 52}); err == nil || !strings.Contains(err.Error(), "更新业务服务失败") {
+			t.Fatalf("expected service refresh failure after cleanup: %v", err)
+		}
+		for _, path := range paths {
+			if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+				t.Fatalf("partial file was not removed: %s %v", path, statErr)
+			}
+		}
+		if err = os.WriteFile("go.mod", []byte("module example.com/cleanupretry\n\ngo 1.24.4\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err = service.DeleteBuild(ctx, &sysin.GenCodesDeleteBuildInp{Id: 52}); err != nil {
+			t.Fatalf("cleanup retry failed: %v", err)
+		}
+		if got := gconv.Int(fixture.record["status"]); got != consts.GenCodesStatusWait {
+			t.Fatalf("cleanup retry did not reset status: %d", got)
+		}
+		// 清理的状态重置也必须走显式事务，提交失败不能被报告为清理成功。
+		fixture.record["status"] = consts.GenCodesStatusFail
+		previousPool := genCodesSessionPool
+		genCodesSessionPool = sql.OpenDB(genCodesSessionConnector{&genCodesSessionStore{failCommit: true}})
+		defer func() {
+			genCodesSessionPool.Close()
+			genCodesSessionPool = previousPool
+		}()
+		if err = service.DeleteBuild(ctx, &sysin.GenCodesDeleteBuildInp{Id: 52}); err == nil || !strings.Contains(err.Error(), "更新生成状态失败") {
+			t.Fatalf("cleanup status commit failure hidden: %v", err)
+		}
+	})
 
 	t.Run("stale save preserves result", func(t *testing.T) {
 		ctx, fixture := newContext()
@@ -187,6 +350,16 @@ func TestGenCodesEditPreservesBuildStatus(t *testing.T) {
 			}
 		})
 	}
+	t.Run("record removed during generation cannot report success", func(t *testing.T) {
+		ctx, fixture := newContext()
+		err := NewSysGenCodes().build(ctx, &sysin.GenCodesBuildInp{SysGenCodes: newInput()}, func(context.Context, *sysin.GenCodesBuildInp) error {
+			fixture.record = nil
+			return nil
+		})
+		if err == nil || !strings.Contains(err.Error(), "结果状态保存失败") {
+			t.Fatalf("removed record reported as completed: %v", err)
+		}
+	})
 	t.Run("failure status persistence error", func(t *testing.T) {
 		ctx, fixture := newContext()
 		fixture.failFinalStatus = true

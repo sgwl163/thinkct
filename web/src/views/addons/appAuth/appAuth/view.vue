@@ -4,93 +4,92 @@
       <n-drawer-content title="授权管理详情" closable>
         <n-spin :show="loading" description="请稍候...">
           <n-descriptions label-placement="left" class="py-2" :column="1">
-            <n-descriptions-item>
-              <template #label>
-                用户ID
-              </template>
-              {{ formValue.userId }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                产品ID
-              </template>
-              {{ formValue.productId }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                名称
-              </template>
-              {{ formValue.name }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                域名
-              </template>
-              {{ formValue.host }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                IP
-              </template>
-              {{ formValue.ip }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                QQ
-              </template>
-              {{ formValue.qq }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                电话
-              </template>
-              {{ formValue.phone }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                授权码
-              </template>
-              {{ formValue.syskey }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                版本
-              </template>
-              {{ formValue.versionId }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                验证方式:0=单域名验证,1=IP双重验证
-              </template>
-              {{ formValue.authMode }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                验证域名:0=当前单域名方式,1=顶级泛域名方式
-              </template>
-              {{ formValue.authDomain }}
-            </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                浏览量
-              </template>
-              {{ formValue.views }}
-            </n-descriptions-item>
-            <n-descriptions-item label="状态:1=启用,0=禁用">
+            <n-descriptions-item label="ID">{{ formValue.id }}</n-descriptions-item>
+            <n-descriptions-item label="授权名称">{{ formValue.name }}</n-descriptions-item>
+            <n-descriptions-item label="所属产品">
               <n-tag
-            :type="dict.getType('sys_normal_disable', formValue.status)"
-            size="small"
-            class="min-left-space"
-          >
+                v-if="formValue.productId"
+                :type="dict.getType('AppAuthProductOptions', formValue.productId)"
+                size="small"
+                :bordered="false"
+              >
+                {{ getProductLabel(formValue.productId) }}
+              </n-tag>
+              <template v-else>-</template>
+            </n-descriptions-item>
+            <n-descriptions-item label="所属用户">
+              <n-tag
+                v-if="formValue.userId"
+                :type="dict.getType('AppAuthUserOptions', formValue.userId)"
+                size="small"
+                :bordered="false"
+              >
+                {{ getUserLabel(formValue.userId) }}
+              </n-tag>
+              <template v-else>-</template>
+            </n-descriptions-item>
+            <n-descriptions-item label="授权域名">
+              <n-text code v-if="formValue.host">{{ formValue.host }}</n-text>
+              <template v-else>-</template>
+            </n-descriptions-item>
+            <n-descriptions-item label="验证方式">
+              <n-tag
+                :type="dict.getType('AppAuthModeOptions', formValue.authMode)"
+                size="small"
+                :bordered="false"
+              >
+                {{ dict.getLabel('AppAuthModeOptions', formValue.authMode) || '-' }}
+              </n-tag>
+            </n-descriptions-item>
+            <n-descriptions-item label="授权IP" v-if="requiresIp(formValue.authMode)">
+              <n-text code v-if="formValue.ip">{{ formValue.ip }}</n-text>
+              <template v-else>-</template>
+            </n-descriptions-item>
+            <n-descriptions-item label="域名范围">
+              <n-tag
+                :type="dict.getType('AppAuthDomainOptions', formValue.authDomain)"
+                size="small"
+                :bordered="false"
+              >
+                {{ dict.getLabel('AppAuthDomainOptions', formValue.authDomain) || '-' }}
+              </n-tag>
+            </n-descriptions-item>
+            <n-descriptions-item label="版本号">
+              <n-tag v-if="formValue.versionId" size="small" :bordered="false">{{
+                formValue.versionId
+              }}</n-tag>
+              <template v-else>-</template>
+            </n-descriptions-item>
+            <n-descriptions-item label="授权码">
+              <n-input
+                :value="formValue.syskey"
+                type="password"
+                show-password-on="click"
+                placeholder="未设置授权码"
+                readonly
+              />
+            </n-descriptions-item>
+            <n-descriptions-item label="QQ">{{ formValue.qq || '-' }}</n-descriptions-item>
+            <n-descriptions-item label="联系电话">{{ formValue.phone || '-' }}</n-descriptions-item>
+            <n-descriptions-item label="状态">
+              <n-tag
+                :type="dict.getType('sys_normal_disable', formValue.status)"
+                size="small"
+                :bordered="false"
+              >
                 {{ dict.getLabel('sys_normal_disable', formValue.status) }}
               </n-tag>
             </n-descriptions-item>
-            <n-descriptions-item>
-              <template #label>
-                到期时间
-              </template>
-              {{ formValue.expiredAt }}
+            <n-descriptions-item label="创建时间">
+              {{ formatDateTime(formValue.createdAt) }}
             </n-descriptions-item>
+            <n-descriptions-item label="更新时间">
+              {{ formatDateTime(formValue.updatedAt) }}
+            </n-descriptions-item>
+            <n-descriptions-item label="到期时间">
+              {{ formatDateTime(formValue.expiredAt) }}
+            </n-descriptions-item>
+            <n-descriptions-item label="浏览量">{{ formValue.views }}</n-descriptions-item>
           </n-descriptions>
         </n-spin>
       </n-drawer-content>
@@ -98,13 +97,19 @@
   </div>
 </template>
 <script lang="ts" setup>
-  import { useMessage } from 'naive-ui';
+  import { computed, ref } from 'vue';
   import { View } from '@/api/addons/appAuth/appAuth';
-  import { State, newState } from './model';
+  import {
+    State,
+    newState,
+    getProductLabel,
+    getUserLabel,
+    requiresIp,
+    formatDateTime,
+  } from './model';
   import { adaModalWidth } from '@/utils/hotgo';
   import { useDictStore } from '@/store/modules/dict';
 
-  const message = useMessage();
   const dict = useDictStore();
   const loading = ref(false);
   const showModal = ref(false);
@@ -115,11 +120,12 @@
 
   // 打开模态框
   function openModal(state: State) {
+    formValue.value = newState(state);
     showModal.value = true;
     loading.value = true;
     View({ id: state.id })
       .then((res) => {
-        formValue.value = res;
+        formValue.value = newState(res);
       })
       .finally(() => {
         loading.value = false;

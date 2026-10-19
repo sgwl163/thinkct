@@ -12,9 +12,13 @@ import (
 	"hotgo/addons/appAuth/model/input/sysin"
 	"hotgo/addons/appAuth/service"
 	"hotgo/internal/dao"
+	"hotgo/internal/library/dict"
 	"hotgo/internal/library/hgorm"
 	"hotgo/internal/library/hgorm/handler"
+	"hotgo/internal/model"
+	"hotgo/internal/model/entity"
 	"hotgo/internal/model/input/form"
+	iservice "hotgo/internal/service"
 	"hotgo/utility/convert"
 	"hotgo/utility/excel"
 
@@ -33,6 +37,31 @@ func NewSysAppAuth() *sSysAppAuth {
 
 func init() {
 	service.RegisterSysAppAuth(NewSysAppAuth())
+	dict.RegisterFunc("AppAuthUserOptions", "授权所属会员选项", service.SysAppAuth().UserOption)
+}
+
+// UserOption 获取授权所属会员选项，通过主模块服务沿用会员查询权限，仅返回选择所需字段。
+func (s *sSysAppAuth) UserOption(ctx context.Context) (opts []*model.Option, err error) {
+	var users []*entity.User
+	cols := dao.User.Columns()
+	if err = iservice.UserUser().Model(ctx).Fields(cols.Id, cols.Nickname).
+		OrderDesc(cols.Id).Scan(&users); err != nil {
+		return nil, gerror.Wrap(err, "获取授权用户选项失败，请稍后重试")
+	}
+
+	opts = make([]*model.Option, 0, len(users))
+	for _, user := range users {
+		opts = append(opts, appAuthUserOption(user))
+	}
+	return
+}
+
+func appAuthUserOption(user *entity.User) *model.Option {
+	label := user.Nickname
+	if label == "" {
+		label = "未设置昵称"
+	}
+	return dict.GenPrimaryOption(user.Id, label)
 }
 
 // Model 授权管理ORM模型

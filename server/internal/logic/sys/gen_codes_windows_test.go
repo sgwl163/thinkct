@@ -13,8 +13,10 @@ import (
 
 	"golang.org/x/sys/windows"
 
+	"hotgo/internal/consts"
 	"hotgo/internal/model"
 	"hotgo/internal/model/entity"
+	"hotgo/internal/model/input/sysin"
 )
 
 func mapGenerationFile(t *testing.T, path string) func() {
@@ -79,6 +81,32 @@ func TestRefreshBuildServicesReplacesMappedFile(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "IActive interface") {
 		t.Fatalf("new service was not published: %s", content)
+	}
+}
+
+func TestPublishBuildPreviewPreservesLockedOriginal(t *testing.T) {
+	disableGenCodesFileLogs(t)
+	path := filepath.Join(t.TempDir(), "index.vue")
+	const old = "original generated view must remain intact"
+	if err := os.WriteFile(path, []byte(old), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mapGenerationFile(t, path)
+	preview := &sysin.GenCodesPreviewModel{Views: map[string]*sysin.GenFile{
+		"web.index.vue": {Path: path, Content: "replacement", Meth: consts.GenCodesBuildMethCover},
+	}}
+	err := NewSysGenCodes().publishBuildPreview(context.Background(), 52, preview,
+		func(context.Context) error { return nil },
+		func(context.Context) error {
+			t.Error("service generation ran after file publication failed")
+			return nil
+		})
+	if err == nil {
+		t.Fatal("publishing a permanently mapped view should fail")
+	}
+	content, readErr := os.ReadFile(path)
+	if readErr != nil || string(content) != old {
+		t.Fatalf("original view damaged: content=%q err=%v", content, readErr)
 	}
 }
 

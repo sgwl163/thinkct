@@ -10,12 +10,15 @@ import (
 	"hotgo/addons/appAuth/model"
 	"hotgo/addons/appAuth/model/input/sysin"
 	"hotgo/internal/library/hgorm/handler"
+	im "hotgo/internal/model"
 
 	"github.com/gogf/gf/v2/database/gdb"
 )
 
 type (
 	ISysAppAuth interface {
+		// UserOption 获取授权所属会员选项
+		UserOption(ctx context.Context) (opts []*im.Option, err error)
 		// Model 授权管理ORM模型
 		Model(ctx context.Context, option ...*handler.Option) *gdb.Model
 		// List 获取授权管理列表
@@ -60,6 +63,8 @@ type (
 		View(ctx context.Context, in *sysin.AppLogViewInp) (res *sysin.AppLogViewModel, err error)
 	}
 	ISysAppProducts interface {
+		// Option 获取应用授权产品选项
+		Option(ctx context.Context) (opts []*im.Option, err error)
 		// Model 产品管理ORM模型
 		Model(ctx context.Context, option ...*handler.Option) *gdb.Model
 		// List 获取产品管理列表

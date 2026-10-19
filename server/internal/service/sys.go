@@ -284,7 +284,7 @@ type (
 		Commit() error
 		Rollback() error
 		ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error)
-		QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error)
+		QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error)
 	}
 	ISessionRows interface {
 		Columns() []string
