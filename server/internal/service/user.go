@@ -9,6 +9,7 @@ import (
 	"context"
 	v1 "hotgo/api/api/user/v1"
 	"hotgo/internal/library/hgorm/handler"
+	"hotgo/internal/model/input/payin"
 	"hotgo/internal/model/input/userin"
 
 	"github.com/gogf/gf/v2/database/gdb"
@@ -16,6 +17,11 @@ import (
 
 type (
 	IApiUser interface {
+		RechargeOptions(ctx context.Context, req *v1.RechargeOptionsReq) (*v1.RechargeOptionsRes, error)
+		RechargeCreate(ctx context.Context, req *v1.RechargeCreateReq) (*v1.RechargeCreateRes, error)
+		RechargeView(ctx context.Context, req *v1.RechargeViewReq) (*v1.RechargeViewRes, error)
+		RechargeList(ctx context.Context, req *v1.RechargeListReq) (*v1.RechargeListRes, error)
+		RechargeNotify(ctx context.Context, in *payin.NotifyCallFuncInp) error
 		Login(ctx context.Context, req *v1.LoginReq) (res *v1.LoginRes, err error)
 		Info(ctx context.Context, _ *v1.InfoReq) (res *v1.InfoRes, err error)
 		Register(ctx context.Context, req *v1.RegisterReq) (res *v1.RegisterRes, err error)

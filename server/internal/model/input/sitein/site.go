@@ -11,6 +11,17 @@ type IndexInp struct {
 // IndexModel 获取首页数据出参
 type IndexModel struct {
 	SiteConfig map[string]interface{} `json:"siteConfig"`
+	NavMenu    []*NavMenuItem         `json:"navMenu"`
+}
+
+// NavMenuItem 前台导航树节点，仅包含展示所需字段。
+type NavMenuItem struct {
+	Id       int64          `json:"id"`
+	Name     string         `json:"name"`
+	Url      string         `json:"url"`
+	Image    string         `json:"image"`
+	ImageAlt string         `json:"imageAlt"`
+	Children []*NavMenuItem `json:"children"`
 }
 
 // HomeInp 获取首页聚合数据入参
@@ -26,7 +37,7 @@ type HomeInp struct {
 // ProductChannelModel 带有产品列表的分类结构
 type ProductChannelModel struct {
 	*entity.WebChannel
-	List []*entity.WebProducts `json:"list"`
+	List []*entity.ShopProduct `json:"list"`
 }
 
 // ArticleChannelModel 带有文章列表的分类结构
@@ -35,8 +46,22 @@ type ArticleChannelModel struct {
 	List []*entity.WebArticle `json:"list"`
 }
 
+// CarouselItem 首页轮播展示数据，不暴露管理字段。
+type CarouselItem struct {
+	Id          int64  `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	CtaText     string `json:"ctaText"`
+	CtaLink     string `json:"ctaLink"`
+	Color       string `json:"color"`
+	Image       string `json:"image"`
+	Alt         string `json:"alt"`
+	AspectRatio string `json:"aspectRatio"`
+}
+
 // HomeModel 获取首页聚合数据出参
 type HomeModel struct {
+	Carousels        []*CarouselItem        `json:"carousels"`
 	ProductsChannels []*ProductChannelModel `json:"productsChannels"`
 	CasesChannels    []*ArticleChannelModel `json:"casesChannels"`
 	NewsChannels     []*ArticleChannelModel `json:"newsChannels"`

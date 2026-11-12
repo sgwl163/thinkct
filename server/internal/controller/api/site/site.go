@@ -29,6 +29,7 @@ func (c *cSite) Index(ctx context.Context, req *v1.IndexReq) (res *v1.IndexRes, 
 
 	res = new(v1.IndexRes)
 	res.SiteConfig = data.SiteConfig
+	res.NavMenu = data.NavMenu
 	return res, nil
 }
 
@@ -47,6 +48,7 @@ func (c *cSite) Home(ctx context.Context, req *v1.HomeReq) (res *v1.HomeRes, err
 	}
 
 	res = new(v1.HomeRes)
+	res.Carousels = data.Carousels
 	res.ProductsChannels = data.ProductsChannels
 	res.CasesChannels = data.CasesChannels
 	res.NewsChannels = data.NewsChannels

@@ -7,11 +7,9 @@
       preset="dialog"
       transform-origin="center"
       :title="formValue.id > 0 ? '编辑版本更新 #' + formValue.id : '添加版本更新'"
-      :style="{
-        width: dialogWidth,
-      }"
+      class="app-version-edit-modal"
     >
-      <n-scrollbar style="max-height: 87vh" class="pr-5">
+      <n-scrollbar class="app-version-edit-scrollbar pr-5">
         <n-spin :show="loading" description="请稍候...">
           <n-form
             ref="formRef"
@@ -26,11 +24,13 @@
               responsive="screen"
             >
               <n-gi span="1">
-                <n-form-item label="产品ID" path="productId">
-                  <n-input-number
-                    placeholder="请输入产品ID"
+                <n-form-item label="所属产品" path="productId">
+                  <n-select
                     v-model:value="formValue.productId"
-                    />
+                    :options="productOptions"
+                    placeholder="请选择所属产品"
+                    filterable
+                  />
                 </n-form-item>
               </n-gi>
               <n-gi span="1">
@@ -51,7 +51,7 @@
               </n-gi>
               <n-gi span="1">
                 <n-form-item label="详情" path="content">
-                  <Editor style="height: 450px" id="content" v-model:value="formValue.content" />
+                  <Editor class="app-version-editor" id="content" v-model:value="formValue.content" />
                 </n-form-item>
               </n-gi>
               <n-gi span="1">
@@ -95,11 +95,10 @@
 <script lang="ts" setup>
   import { useDictStore } from '@/store/modules/dict';
   import { Edit, View } from '@/api/addons/appAuth/appVersion';
-  import { State, newState, rules } from './model';
+  import { State, newState, rules, productOptions } from './model';
   import Editor from '@/components/Editor/editor.vue';
   import { useProjectSettingStore } from '@/store/modules/projectSetting';
   import { useMessage } from 'naive-ui';
-  import { adaModalWidth } from '@/utils/hotgo';
 
   const emit = defineEmits(['reloadTable']);
   const message = useMessage();
@@ -110,9 +109,6 @@
   const formValue = ref<State>(newState(null));
   const formRef = ref<any>({});
   const formBtnLoading = ref(false);
-  const dialogWidth = computed(() => {
-    return adaModalWidth(840);
-  });
   const isFormValid = ref(true);
 
   // 提交表单
@@ -169,4 +165,17 @@
   });
 </script>
 
-<style lang="less"></style>
+<style lang="less">
+  .n-dialog.n-modal.app-version-edit-modal {
+    width: 840px;
+    max-width: 100%;
+  }
+
+  .app-version-edit-scrollbar {
+    max-height: 87vh;
+  }
+
+  .app-version-editor {
+    height: 450px;
+  }
+</style>

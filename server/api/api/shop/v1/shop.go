@@ -22,6 +22,17 @@ type CreateOrderRes struct {
 	Order *OrderDetail `json:"order" dc:"订单详情"`
 }
 
+type PurchaseOrderReq struct {
+	g.Meta    `path:"/shop/order/purchase" method:"post" tags:"商城订单" summary:"余额购买商城商品"`
+	Products  []OrderProduct `json:"products" v:"required|length:1,50#商品不能为空|商品数量最多50种" dc:"商品列表"`
+	Remark    string         `json:"remark" v:"length:0,500#订单备注不能超过500个字符" dc:"订单备注"`
+	RequestId string         `json:"requestId" v:"required|regex:^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$#请求标识不能为空|请求标识必须为UUID v4" dc:"幂等请求标识"`
+}
+
+type PurchaseOrderRes struct {
+	Order *OrderDetail `json:"order" dc:"订单详情"`
+}
+
 type OrderListReq struct {
 	g.Meta `path:"/shop/order/list" method:"get" tags:"商城订单" summary:"获取我的商城订单"`
 	form.PageReq

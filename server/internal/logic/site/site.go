@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"hotgo/internal/consts"
 	"hotgo/internal/dao"
 	"hotgo/internal/model/entity"
 	"hotgo/internal/model/input/sitein"
@@ -85,14 +86,14 @@ func formatChannelUrl(ch *entity.WebChannel) {
 // formatArticleUrl 格式化文章URL
 func formatArticleUrl(article *entity.WebArticle, ch *entity.WebChannel) {
 	if article != nil && article.Url == "" && ch != nil && ch.Diyname != "" {
-		article.Url = "/" + ch.Diyname + "/detail/" + gconv.String(article.Id)
+		article.Url = "/" + ch.Diyname + "/" + gconv.String(article.Id)
 	}
 }
 
 // formatProductUrl 格式化产品URL
-func formatProductUrl(product *entity.WebProducts, ch *entity.WebChannel) {
+func formatProductUrl(product *entity.ShopProduct, ch *entity.WebChannel) {
 	if product != nil && product.Url == "" && ch != nil && ch.Diyname != "" {
-		product.Url = "/" + ch.Diyname + "/detail/" + gconv.String(product.Id)
+		product.Url = "/" + ch.Diyname + "/" + gconv.String(product.Id)
 	}
 }
 
@@ -305,7 +306,7 @@ func (s *sApiSite) loadArticleAuthorStats(ctx context.Context, authorColumn stri
 	return stats, nil
 }
 
-func formatProduct(product *entity.WebProducts, channelMap map[uint]*entity.WebChannel, fallbackChannel *entity.WebChannel) {
+func formatProduct(product *entity.ShopProduct, channelMap map[uint]*entity.WebChannel, fallbackChannel *entity.WebChannel) {
 	if product == nil {
 		return
 	}
@@ -317,13 +318,13 @@ func formatProduct(product *entity.WebProducts, channelMap map[uint]*entity.WebC
 	formatProductUrl(product, channel)
 }
 
-func formatProducts(products []*entity.WebProducts, channelMap map[uint]*entity.WebChannel, fallbackChannel *entity.WebChannel) {
+func formatProducts(products []*entity.ShopProduct, channelMap map[uint]*entity.WebChannel, fallbackChannel *entity.WebChannel) {
 	for _, product := range products {
 		formatProduct(product, channelMap, fallbackChannel)
 	}
 }
 
-func getProductChannelIds(products []*entity.WebProducts) []uint {
+func getProductChannelIds(products []*entity.ShopProduct) []uint {
 	channelIds := make([]uint, 0)
 	channelIdSet := make(map[uint]struct{})
 	for _, product := range products {
@@ -380,8 +381,40 @@ func (s *sApiSite) Index(ctx context.Context, in sitein.IndexInp) (res *sitein.I
 	}
 
 	res.SiteConfig = siteMap
+	columns := dao.WebNavMenu.Columns()
+	var menus []*entity.WebNavMenu
+	if err = dao.WebNavMenu.Ctx(ctx).Where(columns.Status, consts.StatusEnabled).
+		OrderAsc(columns.Sort).OrderAsc(columns.Id).Scan(&menus); err != nil {
+		return nil, gerror.Wrap(err, "获取网站导航失败")
+	}
+	res.NavMenu = buildNavMenuTree(menus)
 
 	return res, nil
+}
+
+// buildNavMenuTree 只遍历从根可达的启用节点，避免禁用父节点的子项被提升为顶级导航。
+func buildNavMenuTree(menus []*entity.WebNavMenu) []*sitein.NavMenuItem {
+	children := make(map[int64][]*entity.WebNavMenu)
+	for _, menu := range menus {
+		children[menu.Pid] = append(children[menu.Pid], menu)
+	}
+	visited := make(map[int64]bool)
+	var build func(int64) []*sitein.NavMenuItem
+	build = func(pid int64) []*sitein.NavMenuItem {
+		items := make([]*sitein.NavMenuItem, 0, len(children[pid]))
+		for _, menu := range children[pid] {
+			if visited[menu.Id] {
+				continue
+			}
+			visited[menu.Id] = true
+			items = append(items, &sitein.NavMenuItem{
+				Id: menu.Id, Name: menu.Name, Url: menu.Url,
+				Image: menu.Image, ImageAlt: menu.ImageAlt, Children: build(menu.Id),
+			})
+		}
+		return items
+	}
+	return build(0)
 }
 
 // Home 获取首页各个栏目的聚合数据
@@ -416,13 +449,13 @@ func (s *sApiSite) Home(ctx context.Context, in sitein.HomeInp) (res *sitein.Hom
 			formatChannelUrl(ch)
 			model := &sitein.ProductChannelModel{
 				WebChannel: ch,
-				List:       make([]*entity.WebProducts, 0),
+				List:       make([]*entity.ShopProduct, 0),
 			}
 			channelIds, channelMap := getChannelIdsAndMap(ctx, ch)
 
 			// 查询该栏目及子栏目下的产品内容
-			var chProducts []*entity.WebProducts
-			err = dao.WebProducts.Ctx(ctx).Where("status", "normal").WhereIn("channel_id", channelIds).Order("weigh desc, id desc").Limit(productsLimit).Scan(&chProducts)
+			var chProducts []*entity.ShopProduct
+			err = dao.ShopProduct.Ctx(ctx).Where("status", "normal").WhereIn("channel_id", channelIds).Order("weigh desc, id desc").Limit(productsLimit).Scan(&chProducts)
 			if err == nil && chProducts != nil {
 				formatProducts(chProducts, channelMap, ch)
 				model.List = chProducts
@@ -491,6 +524,13 @@ func (s *sApiSite) Home(ctx context.Context, in sitein.HomeInp) (res *sitein.Hom
 		res.Links = links
 	} else {
 		res.Links = make([]*entity.WebLinks, 0)
+	}
+
+	columns := dao.WebCarousel.Columns()
+	res.Carousels = make([]*sitein.CarouselItem, 0)
+	if err = dao.WebCarousel.Ctx(ctx).Where(columns.Status, consts.StatusEnabled).
+		OrderAsc(columns.Sort).OrderAsc(columns.Id).Scan(&res.Carousels); err != nil {
+		return nil, gerror.Wrap(err, "获取首页轮播图失败")
 	}
 
 	return res, nil
@@ -584,32 +624,32 @@ func (s *sApiSite) Channel(ctx context.Context, in sitein.ChannelInp) (res *site
 				res.HotList = hotList
 			} else if res.Channel.Model == "products" {
 				m := filterContentByChannelIds(
-					dao.WebProducts.Ctx(ctx).Where("status", 1),
-					dao.WebProducts.Columns().ChannelId,
-					dao.WebProducts.Columns().ChannelIds,
+					dao.ShopProduct.Ctx(ctx).Where("status", 1),
+					dao.ShopProduct.Columns().ChannelId,
+					dao.ShopProduct.Columns().ChannelIds,
 					channelIds,
 				)
-				var list []*entity.WebProducts
+				var list []*entity.ShopProduct
 				var lst interface{} = &list
 				res.Total, err = s.handleList(ctx, m, in, lst)
 				if list == nil {
-					list = make([]*entity.WebProducts, 0)
+					list = make([]*entity.ShopProduct, 0)
 				}
 				formatProducts(list, channelMap, res.Channel)
 				res.List = list
 
 				// 获取热门产品 (根据 views 排序)
 				mHot := filterContentByChannelIds(
-					dao.WebProducts.Ctx(ctx).Where("status", 1),
-					dao.WebProducts.Columns().ChannelId,
-					dao.WebProducts.Columns().ChannelIds,
+					dao.ShopProduct.Ctx(ctx).Where("status", 1),
+					dao.ShopProduct.Columns().ChannelId,
+					dao.ShopProduct.Columns().ChannelIds,
 					channelIds,
 				)
-				var hotList []*entity.WebProducts
+				var hotList []*entity.ShopProduct
 				var hotLst interface{} = &hotList
 				err = s.handleHotList(ctx, mHot, hotLst)
 				if hotList == nil {
-					hotList = make([]*entity.WebProducts, 0)
+					hotList = make([]*entity.ShopProduct, 0)
 				}
 				formatProducts(hotList, channelMap, res.Channel)
 				res.HotList = hotList
@@ -707,8 +747,8 @@ func (s *sApiSite) Content(ctx context.Context, in sitein.ContentInp) (res *site
 		res.HotList = hotList
 
 	} else if res.Channel.Model == "products" {
-		var product *entity.WebProducts
-		err = dao.WebProducts.Ctx(ctx).Where("id", in.Id).Where("status", 1).Scan(&product)
+		var product *entity.ShopProduct
+		err = dao.ShopProduct.Ctx(ctx).Where("id", in.Id).Where("status", 1).Scan(&product)
 		if err != nil {
 			return nil, err
 		}
@@ -716,9 +756,9 @@ func (s *sApiSite) Content(ctx context.Context, in sitein.ContentInp) (res *site
 			formatProduct(product, nil, res.Channel)
 			res.Content = product
 
-			var prevItem *entity.WebProducts
-			var nextItem *entity.WebProducts
-			s.handlePrevNext(ctx, dao.WebProducts.Ctx(ctx), int64(res.Channel.Id), int64(in.Id), &prevItem, &nextItem)
+			var prevItem *entity.ShopProduct
+			var nextItem *entity.ShopProduct
+			s.handlePrevNext(ctx, dao.ShopProduct.Ctx(ctx), int64(res.Channel.Id), int64(in.Id), &prevItem, &nextItem)
 			if prevItem != nil {
 				formatProduct(prevItem, nil, res.Channel)
 				res.Prev = prevItem
@@ -729,7 +769,7 @@ func (s *sApiSite) Content(ctx context.Context, in sitein.ContentInp) (res *site
 			}
 
 			// 每次访问增加一次浏览量
-			dao.WebProducts.Ctx(ctx).Where("id", product.Id).Increment("views", 1)
+			dao.ShopProduct.Ctx(ctx).Where("id", product.Id).Increment("views", 1)
 		} else {
 			return nil, gerror.New("内容不存在或已下架")
 		}
@@ -737,12 +777,12 @@ func (s *sApiSite) Content(ctx context.Context, in sitein.ContentInp) (res *site
 		res.RelatedList = getRelatedChannels(ctx, res.Channel.Pid)
 
 		// 获取热门内容
-		mHot := dao.WebProducts.Ctx(ctx).Where("status", 1).Where("channel_id", res.Channel.Id)
-		var hotList []*entity.WebProducts
+		mHot := dao.ShopProduct.Ctx(ctx).Where("status", 1).Where("channel_id", res.Channel.Id)
+		var hotList []*entity.ShopProduct
 		var hotLst interface{} = &hotList
 		_ = s.handleHotList(ctx, mHot, hotLst)
 		if hotList == nil {
-			hotList = make([]*entity.WebProducts, 0)
+			hotList = make([]*entity.ShopProduct, 0)
 		}
 		formatProducts(hotList, nil, res.Channel)
 		res.HotList = hotList
@@ -791,14 +831,14 @@ func (s *sApiSite) Search(ctx context.Context, in sitein.SearchInp) (res *sitein
 	likeKeywords := "%" + keywords + "%"
 
 	if searchType == "products" {
-		m := dao.WebProducts.Ctx(ctx).Where("status", 1).Where("(title LIKE ? OR description LIKE ?)", likeKeywords, likeKeywords)
+		m := dao.ShopProduct.Ctx(ctx).Where("status", 1).Where("(title LIKE ? OR description LIKE ?)", likeKeywords, likeKeywords)
 		totalCount, countErr := m.Count()
 		if countErr != nil {
 			return nil, countErr
 		}
 		res.Total = totalCount
 
-		var list []*entity.WebProducts
+		var list []*entity.ShopProduct
 		if totalCount > 0 {
 			err = m.Page(page, limit).Order("weigh desc, id desc").Scan(&list)
 			if err != nil {
@@ -806,7 +846,7 @@ func (s *sApiSite) Search(ctx context.Context, in sitein.SearchInp) (res *sitein
 			}
 		}
 		if list == nil {
-			list = make([]*entity.WebProducts, 0)
+			list = make([]*entity.ShopProduct, 0)
 		}
 
 		if len(list) > 0 {

@@ -73,6 +73,22 @@ func (in *ChannelEditInp) Filter(ctx context.Context) (err error) {
 	if err := g.Validator().Rules("required").Data(in.Type).Messages("类型:cover=封面频道,list=列表频道,link=跳转链接不能为空").Run(ctx); err != nil {
 		return err.Current()
 	}
+	// 非跳转链接栏目必须配置路由别名；跳转链接栏目可不配置。
+	if in.Type != "link" || in.Diyname != "" {
+		if err := g.Validator().Rules("required").Data(in.Diyname).Messages("栏目别名不能为空").Run(ctx); err != nil {
+			return err.Current()
+		}
+		if err := g.Validator().Rules("max-length:64").Data(in.Diyname).Messages("栏目别名长度不能超过64个字符").Run(ctx); err != nil {
+			return err.Current()
+		}
+		switch in.Diyname {
+		case "about", "auth", "api", "forum", "login", "register", "forgot-password", "user", "storage", "assets", "images", "_next", "testauth", "search":
+			return gerror.New("栏目别名与系统保留路径冲突，请更换其他别名")
+		}
+		if err := g.Validator().Rules("regex:^[a-z]([a-z0-9-]*[a-z0-9])?$").Data(in.Diyname).Messages("栏目别名须以小写字母开头，只能包含小写字母、数字和连字符，不能以连字符结尾或为纯数字").Run(ctx); err != nil {
+			return err.Current()
+		}
+	}
 	// 验证频道名称
 	if err := g.Validator().Rules("required").Data(in.Name).Messages("频道名称不能为空").Run(ctx); err != nil {
 		return err.Current()

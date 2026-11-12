@@ -72,7 +72,7 @@ export function renderProductTag(productId: number | null) {
   if (!productId) return '-';
   return h(
     NTag,
-    { type: dict.getType('AppAuthProductOptions', productId), size: 'small', bordered: false },
+    { type: dict.getType('AppAuthProductOptions', productId), bordered: false },
     { default: () => getProductLabel(productId) }
   );
 }
@@ -81,14 +81,14 @@ export function renderUserTag(userId: number | null) {
   if (!userId) return '-';
   return h(
     NTag,
-    { type: dict.getType('AppAuthUserOptions', userId), size: 'small', bordered: false },
+    { type: dict.getType('AppAuthUserOptions', userId), bordered: false },
     { default: () => getUserLabel(userId) }
   );
 }
 
 export function renderVersionTag(version: string) {
   if (!version) return '-';
-  return h(NTag, { type: 'default', size: 'small', bordered: false }, { default: () => version });
+  return h(NTag, { type: 'default', bordered: false }, { default: () => version });
 }
 
 export function formatDateTime(value: string): string {
@@ -155,7 +155,7 @@ export const rules: FormRules = {
   },
 };
 
-// 只展示现有列表接口支持的筛选项。
+// 搜索条件与后端列表、导出接口保持一致，选择项统一使用后端字典。
 export const schemas = ref<FormSchema[]>([
   {
     field: 'id',
@@ -167,6 +167,70 @@ export const schemas = ref<FormSchema[]>([
       precision: 0,
       clearable: true,
       showButton: false,
+    },
+  },
+  {
+    field: 'name',
+    component: 'NInput',
+    label: '授权名称',
+    componentProps: {
+      placeholder: '请输入授权名称',
+      clearable: true,
+    },
+  },
+  {
+    field: 'productId',
+    component: 'NSelect',
+    label: '所属产品',
+    defaultValue: null,
+    componentProps: {
+      placeholder: '请选择所属产品',
+      filterable: true,
+      clearable: true,
+      options: productOptions,
+    },
+  },
+  {
+    field: 'userId',
+    component: 'NSelect',
+    label: '所属用户',
+    defaultValue: null,
+    componentProps: {
+      placeholder: '请选择用户，可搜索昵称',
+      filterable: true,
+      clearable: true,
+      options: userOptions,
+    },
+  },
+  {
+    field: 'host',
+    component: 'NInput',
+    label: '授权域名',
+    componentProps: {
+      placeholder: '请输入授权域名',
+      clearable: true,
+    },
+  },
+  {
+    field: 'authMode',
+    component: 'NSelect',
+    label: '验证方式',
+    defaultValue: null,
+    componentProps: {
+      placeholder: '请选择验证方式',
+      clearable: true,
+      options: authModeOptions,
+    },
+  },
+  {
+    field: 'authDomain',
+    component: 'NSelect',
+    label: '域名范围',
+    defaultValue: null,
+    componentProps: {
+      placeholder: '请选择域名范围',
+      clearable: true,
+      options: authDomainOptions,
     },
   },
   {
@@ -184,6 +248,16 @@ export const schemas = ref<FormSchema[]>([
     field: 'createdAt',
     component: 'NDatePicker',
     label: '创建时间',
+    componentProps: {
+      type: 'datetimerange',
+      clearable: true,
+      shortcuts: defRangeShortcuts(),
+    },
+  },
+  {
+    field: 'expiredAt',
+    component: 'NDatePicker',
+    label: '到期时间',
     componentProps: {
       type: 'datetimerange',
       clearable: true,

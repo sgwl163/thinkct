@@ -47,6 +47,14 @@ func (s *sPay) Notify(ctx context.Context, in *payin.PayNotifyInp) (res *payin.P
 		return
 	}
 
+	if models.OrderGroup == consts.OrderGroupUserRecharge {
+		if models.PayType != in.PayType {
+			return nil, gerror.New("支付渠道与充值订单不一致")
+		}
+		err = s.notifyUserRecharge(ctx, models, data)
+		return
+	}
+
 	if models.PayStatus != consts.PayStatusWait {
 		err = gerror.Newf("商户订单号[%v]已被处理，请勿重复操作", data.OutTradeNo)
 		return

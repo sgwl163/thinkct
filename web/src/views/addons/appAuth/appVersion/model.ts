@@ -1,14 +1,18 @@
+import { ref } from 'vue';
 import { cloneDeep } from 'lodash-es';
 import { FormSchema } from '@/components/Form';
 import { defRangeShortcuts } from '@/utils/dateUtil';
 import { renderOptionTag } from '@/utils';
 import { useDictStore } from '@/store/modules/dict';
+import { productOptions, renderProductTag } from '../appAuth/model';
+
+export { productOptions };
 
 const dict = useDictStore();
 
 export class State {
   public id = 0; // ID
-  public productId = 0; // 产品ID
+  public productId: number | null = null; // 产品ID
   public cover = ''; // 封面
   public title = ''; // 标题
   public content = ''; // 详情
@@ -39,15 +43,16 @@ export function newState(state: State | Record<string, any> | null): State {
 export const rules = {
   productId: {
     required: true,
-    trigger: ['blur', 'input'],
+    trigger: ['blur', 'change'],
     type: 'number',
-    message: '请输入产品ID',
+    min: 1,
+    message: '请选择所属产品',
   },
   status: {
     required: true,
-    trigger: ['blur', 'input'],
+    trigger: ['blur', 'change'],
     type: 'number',
-    message: '请输入状态:1=启用,0=禁用',
+    message: '请选择状态',
   },
 };
 
@@ -59,22 +64,33 @@ export const schemas = ref<FormSchema[]>([
     label: 'ID',
     componentProps: {
       placeholder: '请输入ID',
-      onUpdateValue: (e: any) => {
-        console.log(e);
-      },
+      min: 1,
+      precision: 0,
+      clearable: true,
+      showButton: false,
+    },
+  },
+  {
+    field: 'productId',
+    component: 'NSelect',
+    label: '所属产品',
+    defaultValue: null,
+    componentProps: {
+      placeholder: '请选择所属产品',
+      filterable: true,
+      clearable: true,
+      options: productOptions,
     },
   },
   {
     field: 'status',
     component: 'NSelect',
-    label: '状态:1=启用,0=禁用',
+    label: '状态',
     defaultValue: null,
     componentProps: {
-      placeholder: '请选择状态:1=启用,0=禁用',
+      placeholder: '请选择状态',
+      clearable: true,
       options: dict.getOption('sys_normal_disable'),
-      onUpdateValue: (e: any) => {
-        console.log(e);
-      },
     },
   },
   {
@@ -85,9 +101,6 @@ export const schemas = ref<FormSchema[]>([
       type: 'datetimerange',
       clearable: true,
       shortcuts: defRangeShortcuts(),
-      onUpdateValue: (e: any) => {
-        console.log(e);
-      },
     },
   },
 ]);
@@ -98,43 +111,46 @@ export const columns = [
     title: 'ID',
     key: 'id',
     align: 'left',
-    width: -1,
+    width: 80,
   },
   {
-    title: '产品ID',
+    title: '所属产品',
     key: 'productId',
     align: 'left',
-    width: -1,
+    width: 160,
+    render(row: State) {
+      return renderProductTag(row.productId);
+    },
   },
   {
     title: '封面',
     key: 'cover',
     align: 'left',
-    width: -1,
+    width: 160,
   },
   {
     title: '标题',
     key: 'title',
     align: 'left',
-    width: -1,
+    width: 180,
   },
   {
     title: '版本号',
     key: 'version',
     align: 'left',
-    width: -1,
+    width: 120,
   },
   {
     title: '文件',
     key: 'file',
     align: 'left',
-    width: -1,
+    width: 180,
   },
   {
-    title: '状态:1=启用,0=禁用',
+    title: '状态',
     key: 'status',
     align: 'left',
-    width: -1,
+    width: 90,
     render(row: State) {
       return renderOptionTag('sys_normal_disable', row.status);
     },
@@ -143,17 +159,17 @@ export const columns = [
     title: '创建时间',
     key: 'createdAt',
     align: 'left',
-    width: -1,
+    width: 180,
   },
   {
-    title: '修改时间',
+    title: '更新时间',
     key: 'updatedAt',
     align: 'left',
-    width: -1,
+    width: 180,
   },
 ];
 
 // 加载字典数据选项
 export function loadOptions() {
-  dict.loadOptions(['sys_normal_disable']);
+  dict.loadOptions(['sys_normal_disable', 'AppAuthProductOptions']);
 }

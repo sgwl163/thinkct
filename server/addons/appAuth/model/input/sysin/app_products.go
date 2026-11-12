@@ -11,7 +11,7 @@ import (
 	"hotgo/internal/consts"
 	"hotgo/internal/model/entity"
 	"hotgo/internal/model/input/form"
-	"hotgo/utility/validate"
+	"strings"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
@@ -24,14 +24,14 @@ type AppProductsUpdateFields struct {
 	Title       string  `json:"title"       dc:"标题"`
 	Keywords    string  `json:"keywords"    dc:"关键词"`
 	Description string  `json:"description" dc:"描述"`
-	Name        string  `json:"name"        dc:"名称"`
+	Name        string  `json:"name"        dc:"产品名称"`
 	Alias       string  `json:"alias"       dc:"别名"`
 	Content     string  `json:"content"     dc:"内容"`
 	Price       float64 `json:"price"       dc:"价格"`
 	Ysweb       string  `json:"ysweb"       dc:"演示站"`
 	Unique      string  `json:"unique"      dc:"特点"`
 	Weigh       int     `json:"weigh"       dc:"权重"`
-	Status      int     `json:"status"      dc:"状态:0=禁用,1=启用"`
+	Status      int     `json:"status"      dc:"状态"`
 }
 
 // AppProductsInsertFields 新增产品管理字段过滤
@@ -40,14 +40,14 @@ type AppProductsInsertFields struct {
 	Title       string  `json:"title"       dc:"标题"`
 	Keywords    string  `json:"keywords"    dc:"关键词"`
 	Description string  `json:"description" dc:"描述"`
-	Name        string  `json:"name"        dc:"名称"`
+	Name        string  `json:"name"        dc:"产品名称"`
 	Alias       string  `json:"alias"       dc:"别名"`
 	Content     string  `json:"content"     dc:"内容"`
 	Price       float64 `json:"price"       dc:"价格"`
 	Ysweb       string  `json:"ysweb"       dc:"演示站"`
 	Unique      string  `json:"unique"      dc:"特点"`
 	Weigh       int     `json:"weigh"       dc:"权重"`
-	Status      int     `json:"status"      dc:"状态:0=禁用,1=启用"`
+	Status      int     `json:"status"      dc:"状态"`
 }
 
 // AppProductsEditInp 修改/新增产品管理
@@ -56,24 +56,24 @@ type AppProductsEditInp struct {
 }
 
 func (in *AppProductsEditInp) Filter(ctx context.Context) (err error) {
-	// 验证封面
+	in.Name = strings.TrimSpace(in.Name)
+	in.Cover = strings.TrimSpace(in.Cover)
+	in.Unique = strings.TrimSpace(in.Unique)
+	if err := g.Validator().Rules("required").Data(in.Name).Messages("产品名称不能为空").Run(ctx); err != nil {
+		return err.Current()
+	}
 	if err := g.Validator().Rules("required").Data(in.Cover).Messages("封面不能为空").Run(ctx); err != nil {
 		return err.Current()
 	}
-	// 验证价格
+	// 允许零价格，最多10位整数和2位小数。
 	if err := g.Validator().Rules("regex:(^[0-9]{1,10}$)|(^[0-9]{1,10}[\\.]{1}[0-9]{1,2}$)").Data(in.Price).Messages("价格最多允许输入10位整数及2位小数").Run(ctx); err != nil {
 		return err.Current()
 	}
-	// 验证特点
 	if err := g.Validator().Rules("required").Data(in.Unique).Messages("特点不能为空").Run(ctx); err != nil {
 		return err.Current()
 	}
-	// 验证状态:0=禁用,1=启用
-	if err := g.Validator().Rules("required").Data(in.Status).Messages("状态:0=禁用,1=启用不能为空").Run(ctx); err != nil {
-		return err.Current()
-	}
-	if err := g.Validator().Rules("in:1,2").Data(in.Status).Messages("状态:0=禁用,1=启用值不正确").Run(ctx); err != nil {
-		return err.Current()
+	if in.Status != uint(consts.StatusEnabled) && in.Status != uint(consts.StatusDisable) {
+		return gerror.New("请选择有效的产品状态")
 	}
 	return
 }
@@ -108,11 +108,26 @@ type AppProductsViewModel struct {
 type AppProductsListInp struct {
 	form.PageReq
 	Id        int           `json:"id"        dc:"ID"`
-	Status    int           `json:"status"    dc:"状态:0=禁用,1=启用"`
+	Name      string        `json:"name"      dc:"产品名称"`
+	Title     string        `json:"title"     dc:"标题"`
+	Alias     string        `json:"alias"     dc:"别名"`
+	Status    int           `json:"status"    dc:"状态"`
 	CreatedAt []*gtime.Time `json:"createdAt" dc:"创建时间"`
 }
 
 func (in *AppProductsListInp) Filter(ctx context.Context) (err error) {
+	in.Name = strings.TrimSpace(in.Name)
+	in.Title = strings.TrimSpace(in.Title)
+	in.Alias = strings.TrimSpace(in.Alias)
+	if len(in.CreatedAt) > 0 {
+		if len(in.CreatedAt) != 2 || in.CreatedAt[0] == nil || in.CreatedAt[1] == nil ||
+			in.CreatedAt[0].IsZero() || in.CreatedAt[1].IsZero() {
+			return gerror.New("请选择完整的创建时间范围")
+		}
+		if in.CreatedAt[0].After(in.CreatedAt[1]) {
+			return gerror.New("创建时间的开始时间不能晚于结束时间")
+		}
+	}
 	return
 }
 
@@ -122,15 +137,15 @@ type AppProductsListModel struct {
 	Title       string      `json:"title"       dc:"标题"`
 	Keywords    string      `json:"keywords"    dc:"关键词"`
 	Description string      `json:"description" dc:"描述"`
-	Name        string      `json:"name"        dc:"名称"`
+	Name        string      `json:"name"        dc:"产品名称"`
 	Alias       string      `json:"alias"       dc:"别名"`
 	Price       float64     `json:"price"       dc:"价格"`
 	Ysweb       string      `json:"ysweb"       dc:"演示站"`
 	Unique      string      `json:"unique"      dc:"特点"`
 	Weigh       int         `json:"weigh"       dc:"权重"`
-	Status      int         `json:"status"      dc:"状态:0=禁用,1=启用"`
+	Status      int         `json:"status"      dc:"状态"`
 	CreatedAt   *gtime.Time `json:"createdAt"   dc:"创建时间"`
-	UpdatedAt   *gtime.Time `json:"updatedAt"   dc:"修改时间"`
+	UpdatedAt   *gtime.Time `json:"updatedAt"   dc:"更新时间"`
 }
 
 // AppProductsExportModel 导出产品管理
@@ -140,15 +155,15 @@ type AppProductsExportModel struct {
 	Title       string      `json:"title"       dc:"标题"`
 	Keywords    string      `json:"keywords"    dc:"关键词"`
 	Description string      `json:"description" dc:"描述"`
-	Name        string      `json:"name"        dc:"名称"`
+	Name        string      `json:"name"        dc:"产品名称"`
 	Alias       string      `json:"alias"       dc:"别名"`
 	Price       float64     `json:"price"       dc:"价格"`
 	Ysweb       string      `json:"ysweb"       dc:"演示站"`
 	Unique      string      `json:"unique"      dc:"特点"`
 	Weigh       int         `json:"weigh"       dc:"权重"`
-	Status      int         `json:"status"      dc:"状态:0=禁用,1=启用"`
+	Status      int         `json:"status"      dc:"状态"`
 	CreatedAt   *gtime.Time `json:"createdAt"   dc:"创建时间"`
-	UpdatedAt   *gtime.Time `json:"updatedAt"   dc:"修改时间"`
+	UpdatedAt   *gtime.Time `json:"updatedAt"   dc:"更新时间"`
 }
 
 // AppProductsStatusInp 更新产品管理状态
@@ -159,18 +174,10 @@ type AppProductsStatusInp struct {
 
 func (in *AppProductsStatusInp) Filter(ctx context.Context) (err error) {
 	if in.Id <= 0 {
-		err = gerror.New("ID不能为空")
-		return
+		return gerror.New("ID不能为空")
 	}
-
-	if in.Status <= 0 {
-		err = gerror.New("状态不能为空")
-		return
-	}
-
-	if !validate.InSlice(consts.StatusSlice, in.Status) {
-		err = gerror.New("状态不正确")
-		return
+	if in.Status != consts.StatusEnabled && in.Status != consts.StatusDisable {
+		return gerror.New("请选择有效的产品状态")
 	}
 	return
 }

@@ -83,7 +83,7 @@
   import { usePermission } from '@/hooks/web/usePermission';
   import { List, Export, Delete } from '@/api/addons/appAuth/appLog';
   import { PlusOutlined, ExportOutlined, DeleteOutlined } from '@vicons/antd';
-  import { columns, schemas, State } from './model';
+  import { columns, schemas, State, loadOptions } from './model';
   import { adaTableScrollX } from '@/utils/hotgo';
   import Edit from './edit.vue';
   import View from './view.vue';
@@ -217,6 +217,10 @@
     message.loading('正在导出列表...', { duration: 1200 });
     Export(searchFormRef.value?.formModel);
   }
+
+  onMounted(() => {
+    loadOptions();
+  });
 
 </script>
 

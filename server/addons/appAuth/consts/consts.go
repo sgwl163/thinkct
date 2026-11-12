@@ -10,6 +10,14 @@ import (
 	"hotgo/internal/model"
 )
 
+// 公开域名登记查询状态，与后台启用/禁用状态码分别使用。
+const (
+	AppAuthQueryAuthorized   = "authorized"
+	AppAuthQueryUnauthorized = "unauthorized"
+	AppAuthQueryExpired      = "expired"
+	AppAuthQueryDisabled     = "disabled"
+)
+
 // 授权验证方式，值类型与授权表的字符串字段保持一致。
 const (
 	AppAuthModeDomain   = "0" // 单域名验证

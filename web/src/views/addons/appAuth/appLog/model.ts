@@ -1,11 +1,23 @@
+import { ref } from 'vue';
 import { cloneDeep } from 'lodash-es';
 import { FormSchema } from '@/components/Form';
 import { defRangeShortcuts } from '@/utils/dateUtil';
+import { useDictStore } from '@/store/modules/dict';
+import {
+  productOptions,
+  userOptions,
+  renderProductTag,
+  renderUserTag,
+} from '../appAuth/model';
+
+export { productOptions, userOptions };
+
+const dict = useDictStore();
 
 export class State {
   public id = 0; // ID
-  public userId = 0; // 用户ID
-  public productId = 0; // 产品ID
+  public userId: number | null = null; // 用户ID
+  public productId: number | null = null; // 产品ID
   public host = ''; // 域名
   public content = ''; // 内容
   public ip = ''; // IP
@@ -34,15 +46,17 @@ export function newState(state: State | Record<string, any> | null): State {
 export const rules = {
   userId: {
     required: true,
-    trigger: ['blur', 'input'],
+    trigger: ['blur', 'change'],
     type: 'number',
-    message: '请输入用户ID',
+    min: 1,
+    message: '请选择所属用户',
   },
   productId: {
     required: true,
-    trigger: ['blur', 'input'],
+    trigger: ['blur', 'change'],
     type: 'number',
-    message: '请输入产品ID',
+    min: 1,
+    message: '请选择所属产品',
   },
   host: {
     required: true,
@@ -78,9 +92,34 @@ export const schemas = ref<FormSchema[]>([
     label: 'ID',
     componentProps: {
       placeholder: '请输入ID',
-      onUpdateValue: (e: any) => {
-        console.log(e);
-      },
+      min: 1,
+      precision: 0,
+      clearable: true,
+      showButton: false,
+    },
+  },
+  {
+    field: 'userId',
+    component: 'NSelect',
+    label: '所属用户',
+    defaultValue: null,
+    componentProps: {
+      placeholder: '请选择用户，可搜索昵称',
+      filterable: true,
+      clearable: true,
+      options: userOptions,
+    },
+  },
+  {
+    field: 'productId',
+    component: 'NSelect',
+    label: '所属产品',
+    defaultValue: null,
+    componentProps: {
+      placeholder: '请选择所属产品',
+      filterable: true,
+      clearable: true,
+      options: productOptions,
     },
   },
   {
@@ -91,9 +130,6 @@ export const schemas = ref<FormSchema[]>([
       type: 'datetimerange',
       clearable: true,
       shortcuts: defRangeShortcuts(),
-      onUpdateValue: (e: any) => {
-        console.log(e);
-      },
     },
   },
 ]);
@@ -104,48 +140,59 @@ export const columns = [
     title: 'ID',
     key: 'id',
     align: 'left',
-    width: -1,
+    width: 80,
   },
   {
-    title: '用户ID',
+    title: '所属用户',
     key: 'userId',
     align: 'left',
-    width: -1,
+    width: 180,
+    render(row: State) {
+      return renderUserTag(row.userId);
+    },
   },
   {
-    title: '产品ID',
+    title: '所属产品',
     key: 'productId',
     align: 'left',
-    width: -1,
+    width: 160,
+    render(row: State) {
+      return renderProductTag(row.productId);
+    },
   },
   {
     title: '域名',
     key: 'host',
     align: 'left',
-    width: -1,
+    width: 180,
   },
   {
     title: 'IP',
     key: 'ip',
     align: 'left',
-    width: -1,
+    width: 150,
   },
   {
     title: '版本号',
     key: 'version',
     align: 'left',
-    width: -1,
+    width: 120,
   },
   {
     title: '创建时间',
     key: 'createdAt',
     align: 'left',
-    width: -1,
+    width: 180,
   },
   {
-    title: '修改时间',
+    title: '更新时间',
     key: 'updatedAt',
     align: 'left',
-    width: -1,
+    width: 180,
   },
 ];
+
+// 加载字典数据选项
+export function loadOptions() {
+  dict.loadOptions(['AppAuthProductOptions', 'AppAuthUserOptions']);
+}

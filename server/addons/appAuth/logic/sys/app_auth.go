@@ -81,7 +81,35 @@ func (s *sSysAppAuth) List(ctx context.Context, in *sysin.AppAuthListInp) (list 
 		mod = mod.Where(dao.AppAuth.Columns().Id, in.Id)
 	}
 
-	// 查询状态:1=启用,0=禁用
+	// 查询授权名称
+	if in.Name != "" {
+		mod = mod.WhereLike(dao.AppAuth.Columns().Name, "%"+in.Name+"%")
+	}
+
+	// 查询所属产品
+	if in.ProductId > 0 {
+		mod = mod.Where(dao.AppAuth.Columns().ProductId, in.ProductId)
+	}
+
+	// 查询所属用户
+	if in.UserId > 0 {
+		mod = mod.Where(dao.AppAuth.Columns().UserId, in.UserId)
+	}
+
+	// 查询授权域名
+	if in.Host != "" {
+		mod = mod.WhereLike(dao.AppAuth.Columns().Host, "%"+in.Host+"%")
+	}
+
+	// 字符串 "0" 是有效字典值，空字符串才表示不筛选。
+	if in.AuthMode != "" {
+		mod = mod.Where(dao.AppAuth.Columns().AuthMode, in.AuthMode)
+	}
+	if in.AuthDomain != "" {
+		mod = mod.Where(dao.AppAuth.Columns().AuthDomain, in.AuthDomain)
+	}
+
+	// 查询状态
 	if in.Status > 0 {
 		mod = mod.Where(dao.AppAuth.Columns().Status, in.Status)
 	}
@@ -89,6 +117,11 @@ func (s *sSysAppAuth) List(ctx context.Context, in *sysin.AppAuthListInp) (list 
 	// 查询创建时间
 	if len(in.CreatedAt) == 2 {
 		mod = mod.WhereBetween(dao.AppAuth.Columns().CreatedAt, in.CreatedAt[0], in.CreatedAt[1])
+	}
+
+	// 查询到期时间
+	if len(in.ExpiredAt) == 2 {
+		mod = mod.WhereBetween(dao.AppAuth.Columns().ExpiredAt, in.ExpiredAt[0], in.ExpiredAt[1])
 	}
 
 	// 分页
@@ -138,6 +171,7 @@ func (s *sSysAppAuth) Edit(ctx context.Context, in *sysin.AppAuthEditInp) (err e
 	if err = hgorm.IsUnique(ctx, &dao.AppAuth, g.Map{dao.AppAuth.Columns().Host: in.Host}, "域名已存在", in.Id); err != nil {
 		return
 	}
+	// 创建/更新时间不接收客户端回填，由 GoFrame 在新增、更新时自动维护。
 	return g.DB().Transaction(ctx, func(ctx context.Context, tx gdb.TX) (err error) {
 
 		// 修改

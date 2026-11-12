@@ -83,7 +83,7 @@ type ProductsInsertFields struct {
 
 // ProductsEditInp 修改/新增产品管理
 type ProductsEditInp struct {
-	entity.WebProducts
+	entity.ShopProduct
 }
 
 func (in *ProductsEditInp) Filter(ctx context.Context) (err error) {
@@ -140,7 +140,7 @@ func (in *ProductsViewInp) Filter(ctx context.Context) (err error) {
 }
 
 type ProductsViewModel struct {
-	entity.WebProducts
+	entity.ShopProduct
 }
 
 // ProductsListInp 获取产品管理列表

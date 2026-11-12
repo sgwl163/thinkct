@@ -7,6 +7,10 @@ import (
 )
 
 type IUserV1 interface {
+	RechargeOptions(ctx context.Context, req *v1.RechargeOptionsReq) (*v1.RechargeOptionsRes, error)
+	RechargeCreate(ctx context.Context, req *v1.RechargeCreateReq) (*v1.RechargeCreateRes, error)
+	RechargeView(ctx context.Context, req *v1.RechargeViewReq) (*v1.RechargeViewRes, error)
+	RechargeList(ctx context.Context, req *v1.RechargeListReq) (*v1.RechargeListRes, error)
 	Login(ctx context.Context, req *v1.LoginReq) (res *v1.LoginRes, err error)
 	Info(ctx context.Context, req *v1.InfoReq) (res *v1.InfoRes, err error)
 	Register(ctx context.Context, req *v1.RegisterReq) (res *v1.RegisterRes, err error)

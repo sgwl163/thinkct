@@ -11,6 +11,7 @@ import (
 	"github.com/gogf/gf/v2/text/gstr"
 	"hotgo/internal/consts"
 	"hotgo/internal/library/addons"
+	"hotgo/internal/library/casbin"
 	"hotgo/internal/library/dict"
 	"hotgo/internal/model/input/form"
 	"hotgo/internal/model/input/sysin"
@@ -113,15 +114,58 @@ func (s *sSysAddons) Build(ctx context.Context, in *sysin.AddonsBuildInp) (err e
 
 // Install 安装模块
 func (s *sSysAddons) Install(ctx context.Context, in *sysin.AddonsInstallInp) (err error) {
-	return addons.Install(in.GetModule())
+	return s.changeWithMenus(ctx, in.Name, false)
 }
 
-// Upgrade 更新模块
+// Upgrade 更新模块，同时为旧插件补齐缺失菜单。
 func (s *sSysAddons) Upgrade(ctx context.Context, in *sysin.AddonsUpgradeInp) (err error) {
-	return addons.Upgrade(in.GetModule())
+	return s.changeWithMenus(ctx, in.Name, true)
+}
+
+func (s *sSysAddons) changeWithMenus(ctx context.Context, name string, upgrade bool) error {
+	lock := generationLock(0)
+	locked, err := lock.TryLock()
+	if err != nil {
+		return gerror.Wrap(err, "获取插件菜单操作锁失败")
+	}
+	if !locked {
+		return gerror.New("插件或代码生成正在操作，请稍后重试")
+	}
+	defer lock.Close()
+	module, err := registeredAddon(name)
+	if err != nil {
+		return err
+	}
+	wrapped := &addonWithMenus{Module: module, ctx: ctx}
+	if upgrade {
+		err = addons.Upgrade(wrapped)
+	} else {
+		err = addons.Install(wrapped)
+	}
+	if err != nil {
+		return err
+	}
+	// 提交之后刷新权限，避免把最终回滚的菜单发布到权限缓存。
+	if err = casbin.Refresh(ctx); err != nil {
+		return gerror.Wrap(err, "插件及菜单已保存，但权限刷新失败，请重启服务后刷新页面")
+	}
+	return nil
 }
 
 // UnInstall 卸载模块
 func (s *sSysAddons) UnInstall(ctx context.Context, in *sysin.AddonsUnInstallInp) (err error) {
-	return addons.UnInstall(in.GetModule())
+	lock := generationLock(0)
+	locked, err := lock.TryLock()
+	if err != nil {
+		return gerror.Wrap(err, "获取插件操作锁失败")
+	}
+	if !locked {
+		return gerror.New("插件或代码生成正在操作，请稍后重试")
+	}
+	defer lock.Close()
+	module, err := registeredAddon(in.Name)
+	if err != nil {
+		return err
+	}
+	return addons.UnInstall(module)
 }

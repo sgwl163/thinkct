@@ -243,6 +243,9 @@ func (s *sSysGenCodes) deleteBuildMenus(ctx context.Context, name string) (err e
 
 // Edit 修改/新增
 func (s *sSysGenCodes) Edit(ctx context.Context, in *sysin.GenCodesEditInp) (res *sysin.GenCodesEditModel, err error) {
+	if err = bindAddonMenuParent(ctx, &in.SysGenCodes); err != nil {
+		return nil, err
+	}
 	if in.GenType == 0 {
 		err = gerror.New("生成类型不能为空")
 		return
@@ -572,6 +575,9 @@ func (s *sSysGenCodes) ColumnList(ctx context.Context, in *sysin.GenCodesColumnL
 
 // Preview 生成预览
 func (s *sSysGenCodes) Preview(ctx context.Context, in *sysin.GenCodesPreviewInp) (res *sysin.GenCodesPreviewModel, err error) {
+	if err = bindAddonMenuParent(ctx, &in.SysGenCodes); err != nil {
+		return nil, err
+	}
 	return hggen.Preview(ctx, in)
 }
 

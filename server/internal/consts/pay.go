@@ -18,10 +18,13 @@ func init() {
 }
 
 const (
-	PayTypeALL    = ""       // 全部
-	PayTypeWxPay  = "wxpay"  // 微信支付
-	PayTypeAliPay = "alipay" // 支付宝
-	PayTypeQQPay  = "qqpay"  // QQ支付
+	OrderGroupUserRecharge = "user_recharge" // 前台会员余额充值，独立于后台会员
+	UserRechargePending    = "pending"
+	UserRechargeCompleted  = "completed"
+	PayTypeALL             = ""       // 全部
+	PayTypeWxPay           = "wxpay"  // 微信支付
+	PayTypeAliPay          = "alipay" // 支付宝
+	PayTypeQQPay           = "qqpay"  // QQ支付
 )
 
 var (

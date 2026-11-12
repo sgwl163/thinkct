@@ -37,7 +37,7 @@ func init() {
 
 // Model 产品管理ORM模型
 func (s *sWebProducts) Model(ctx context.Context, option ...*handler.Option) *gdb.Model {
-	return handler.Model(dao.WebProducts.Ctx(ctx), option...)
+	return handler.Model(dao.ShopProduct.Ctx(ctx), option...)
 }
 
 // List 获取产品管理列表
@@ -49,14 +49,14 @@ func (s *sWebProducts) List(ctx context.Context, in *webin.ProductsListInp) (lis
 
 	// 查询ID
 	if in.Id > 0 {
-		mod = mod.Where(dao.WebProducts.Columns().Id, in.Id)
+		mod = mod.Where(dao.ShopProduct.Columns().Id, in.Id)
 	}
 
 	// 分页
 	mod = mod.Page(in.Page, in.PerPage)
 
 	// 排序
-	mod = mod.OrderDesc(dao.WebProducts.Columns().Id)
+	mod = mod.OrderDesc(dao.ShopProduct.Columns().Id)
 
 	// 查询数据
 	if err = mod.ScanAndCount(&list, &totalCount, false); err != nil {
@@ -145,7 +145,7 @@ func (s *sWebProducts) View(ctx context.Context, in *webin.ProductsViewInp) (res
 // Status 更新产品管理状态
 func (s *sWebProducts) Status(ctx context.Context, in *webin.ProductsStatusInp) (err error) {
 	if _, err = s.Model(ctx).WherePri(in.Id).Data(g.Map{
-		dao.WebProducts.Columns().Status: in.Status,
+		dao.ShopProduct.Columns().Status: in.Status,
 	}).Update(); err != nil {
 		err = gerror.Wrap(err, "更新产品管理状态失败，请稍后重试！")
 		return

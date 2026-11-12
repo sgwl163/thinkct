@@ -1,7 +1,4 @@
-// ================================================================================
-// Code generated and maintained by GoFrame CLI tool. DO NOT EDIT.
-// You can delete these comments if you wish manually maintain this interface file.
-// ================================================================================
+// 应用授权系统服务接口，扩展接口随插件业务手工维护。
 
 package service
 
@@ -17,6 +14,8 @@ import (
 
 type (
 	ISysAppAuth interface {
+		// Query 公开查询域名授权登记状态。
+		Query(ctx context.Context, in *sysin.AuthQueryInp) (res *sysin.AuthQueryModel, err error)
 		// UserOption 获取授权所属会员选项
 		UserOption(ctx context.Context) (opts []*im.Option, err error)
 		// Model 授权管理ORM模型
@@ -97,6 +96,10 @@ type (
 		Status(ctx context.Context, in *sysin.AppVersionStatusInp) (err error)
 	}
 	ISysConfig interface {
+		// GetPublic 获取公开产品授权配置。
+		GetPublic(ctx context.Context, in *sysin.AuthConfigInp) (res *sysin.AuthConfigModel, err error)
+		// IncrementAuthQueryCount 原子累加授权查询次数并返回累计值。
+		IncrementAuthQueryCount(ctx context.Context) (count int64, err error)
 		// GetBasic 获取基础配置
 		GetBasic(ctx context.Context) (conf *model.BasicConfig, err error)
 		// GetConfigByGroup 获取指定分组配置

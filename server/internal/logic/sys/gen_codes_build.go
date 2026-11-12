@@ -116,6 +116,9 @@ func (s *sSysGenCodes) executeBuild(ctx context.Context, in *sysin.GenCodesBuild
 	if in.GenType != consts.GenCodesTypeCurd && in.GenType != consts.GenCodesTypeTree {
 		return hggen.Build(ctx, in)
 	}
+	if err := bindAddonMenuParent(ctx, &in.SysGenCodes); err != nil {
+		return err
+	}
 	config, err := s.loadBuildConfig(ctx, in)
 	if err != nil {
 		return err

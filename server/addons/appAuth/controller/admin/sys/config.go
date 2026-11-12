@@ -20,6 +20,9 @@ type cConfig struct{}
 // GetConfig 获取指定分组的配置
 func (c *cConfig) GetConfig(ctx context.Context, req *config.GetReq) (res *config.GetRes, err error) {
 	data, err := service.SysConfig().GetConfigByGroup(ctx, &req.GetConfigInp)
+	if err != nil {
+		return
+	}
 
 	res = new(config.GetRes)
 	res.GetConfigModel = data

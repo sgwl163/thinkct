@@ -23,6 +23,13 @@ func Api(ctx context.Context, group *ghttp.RouterGroup) {
 			// 无需验证的路由
 			api.Index,
 		)
+		group.Group("/", func(group *ghttp.RouterGroup) {
+			group.Middleware(func(r *ghttp.Request) {
+				r.Response.Header().Set("Cache-Control", "no-store")
+				r.Middleware.Next()
+			})
+			group.Bind(api.Auth)
+		})
 		group.Middleware(service.Middleware().ApiAuth)
 		group.Bind(
 		// 需要验证的路由

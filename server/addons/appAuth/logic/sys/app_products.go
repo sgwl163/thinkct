@@ -79,7 +79,18 @@ func (s *sSysAppProducts) List(ctx context.Context, in *sysin.AppProductsListInp
 		mod = mod.Where(dao.AppProducts.Columns().Id, in.Id)
 	}
 
-	// 查询状态:0=禁用,1=启用
+	// 名称、标题和别名分别匹配，组合筛选时同时生效。
+	if in.Name != "" {
+		mod = mod.WhereLike(dao.AppProducts.Columns().Name, "%"+in.Name+"%")
+	}
+	if in.Title != "" {
+		mod = mod.WhereLike(dao.AppProducts.Columns().Title, "%"+in.Title+"%")
+	}
+	if in.Alias != "" {
+		mod = mod.WhereLike(dao.AppProducts.Columns().Alias, "%"+in.Alias+"%")
+	}
+
+	// 查询状态
 	if in.Status > 0 {
 		mod = mod.Where(dao.AppProducts.Columns().Status, in.Status)
 	}
@@ -147,7 +158,7 @@ func (s *sSysAppProducts) Edit(ctx context.Context, in *sysin.AppProductsEditInp
 		// 新增
 		if _, err = s.Model(ctx, &handler.Option{FilterAuth: false}).
 			Fields(sysin.AppProductsInsertFields{}).
-			Data(in).OmitEmptyData().Insert(); err != nil {
+			Data(in).Insert(); err != nil {
 			err = gerror.Wrap(err, "新增产品管理失败，请稍后重试！")
 		}
 		return

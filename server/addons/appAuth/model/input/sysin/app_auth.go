@@ -14,6 +14,7 @@ import (
 	"hotgo/internal/model/entity"
 	"hotgo/internal/model/input/form"
 	"hotgo/utility/validate"
+	"strings"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
@@ -133,12 +134,36 @@ type AppAuthViewModel struct {
 // AppAuthListInp 获取授权管理列表
 type AppAuthListInp struct {
 	form.PageReq
-	Id        int           `json:"id"        dc:"ID"`
-	Status    int           `json:"status"    dc:"状态:1=启用,0=禁用"`
-	CreatedAt []*gtime.Time `json:"createdAt" dc:"创建时间"`
+	Id         int           `json:"id"         dc:"ID"`
+	Name       string        `json:"name"       dc:"授权名称"`
+	ProductId  int           `json:"productId"  dc:"所属产品"`
+	UserId     int           `json:"userId"     dc:"所属用户"`
+	Host       string        `json:"host"       dc:"授权域名"`
+	AuthMode   string        `json:"authMode"   dc:"验证方式"`
+	AuthDomain string        `json:"authDomain" dc:"域名范围"`
+	Status     int           `json:"status"     dc:"状态"`
+	CreatedAt  []*gtime.Time `json:"createdAt"  dc:"创建时间"`
+	ExpiredAt  []*gtime.Time `json:"expiredAt"  dc:"到期时间"`
 }
 
 func (in *AppAuthListInp) Filter(ctx context.Context) (err error) {
+	in.Name = strings.TrimSpace(in.Name)
+	in.Host = strings.TrimSpace(in.Host)
+	if in.AuthMode != "" && !dict.HasOptionKey(ac.AppAuthModeOptions, in.AuthMode) {
+		return gerror.New("请选择有效的验证方式")
+	}
+	if in.AuthDomain != "" && !dict.HasOptionKey(ac.AppAuthDomainOptions, in.AuthDomain) {
+		return gerror.New("请选择有效的域名范围")
+	}
+	if len(in.ExpiredAt) > 0 {
+		if len(in.ExpiredAt) != 2 || in.ExpiredAt[0] == nil || in.ExpiredAt[1] == nil ||
+			in.ExpiredAt[0].IsZero() || in.ExpiredAt[1].IsZero() {
+			return gerror.New("请选择完整的到期时间范围")
+		}
+		if in.ExpiredAt[0].After(in.ExpiredAt[1]) {
+			return gerror.New("到期时间范围的开始时间不能晚于结束时间")
+		}
+	}
 	return
 }
 

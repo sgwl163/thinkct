@@ -7,11 +7,9 @@
       preset="dialog"
       transform-origin="center"
       :title="formValue.id > 0 ? '编辑盗版管理 #' + formValue.id : '添加盗版管理'"
-      :style="{
-        width: dialogWidth,
-      }"
+      class="app-daoban-edit-modal"
     >
-      <n-scrollbar style="max-height: 87vh" class="pr-5">
+      <n-scrollbar class="app-daoban-edit-scrollbar pr-5">
         <n-spin :show="loading" description="请稍候...">
           <n-form
             ref="formRef"
@@ -26,11 +24,13 @@
               responsive="screen"
             >
               <n-gi span="1">
-                <n-form-item label="产品ID" path="productId">
-                  <n-input-number
-                    placeholder="请输入产品ID"
+                <n-form-item label="所属产品" path="productId">
+                  <n-select
                     v-model:value="formValue.productId"
-                    />
+                    :options="productOptions"
+                    placeholder="请选择所属产品"
+                    filterable
+                  />
                 </n-form-item>
               </n-gi>
               <n-gi span="1">
@@ -67,7 +67,7 @@
               </n-gi>
               <n-gi span="1">
                 <n-form-item label="数据" path="data">
-                  <Editor style="height: 450px" id="data" v-model:value="formValue.data" />
+                  <Editor class="app-daoban-editor" id="data" v-model:value="formValue.data" />
                 </n-form-item>
               </n-gi>
               <n-gi span="1">
@@ -97,11 +97,10 @@
 </template>
 <script lang="ts" setup>
   import { Edit, View } from '@/api/addons/appAuth/appDaoban';
-  import { State, newState, rules } from './model';
+  import { State, newState, rules, productOptions } from './model';
   import Editor from '@/components/Editor/editor.vue';
   import { useProjectSettingStore } from '@/store/modules/projectSetting';
   import { useMessage } from 'naive-ui';
-  import { adaModalWidth } from '@/utils/hotgo';
 
   const emit = defineEmits(['reloadTable']);
   const message = useMessage();
@@ -112,9 +111,6 @@
   const formValue = ref<State>(newState(null));
   const formRef = ref<any>({});
   const formBtnLoading = ref(false);
-  const dialogWidth = computed(() => {
-    return adaModalWidth(840);
-  });
   const isFormValid = ref(true);
 
   // 提交表单
@@ -171,4 +167,17 @@
   });
 </script>
 
-<style lang="less"></style>
+<style lang="less">
+  .n-dialog.n-modal.app-daoban-edit-modal {
+    width: 840px;
+    max-width: 100%;
+  }
+
+  .app-daoban-edit-scrollbar {
+    max-height: 87vh;
+  }
+
+  .app-daoban-editor {
+    height: 450px;
+  }
+</style>

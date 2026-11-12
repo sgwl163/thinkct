@@ -25,12 +25,14 @@
 ### 2.1 获取首页综合数据
 - **接口路径**: `/api/site/index` 
 - **请求方式**: `GET`
-- **接口说明**: 用于前端网站获取网站基本配置信息。
+- **接口说明**: 用于前端网站获取网站基本配置信息与头部多级导航。两者在同一次请求中返回，`navMenu` 与 `siteConfig` 同级，均位于 `data` 下。
 
 #### 2.1.1 请求参数
 *(无必填参数)*
 
 #### 2.1.2 响应数据 (Response)
+> 以下为节选：`navMenu` 仅保留部分节点用于说明结构，其中包含一条 4 级链路：产品 → 机房与控制系统 → 关键电源管理 → 交流不间断电源（UPS）。
+
 ```json
 {
   "code": 0,
@@ -52,7 +54,82 @@
       "sitePhone": "185-1000-3363",
       "siteWechatQrCode": "",
       "siteMpQrCode": ""
-    }
+    },
+    "navMenu": [
+      {
+        "id": 1,
+        "name": "产品",
+        "url": "/products",
+        "image": "",
+        "imageAlt": "",
+        "children": [
+          {
+            "id": 30,
+            "name": "机房与控制系统",
+            "url": "/products/control-systems",
+            "image": "",
+            "imageAlt": "",
+            "children": [
+              {
+                "id": 34,
+                "name": "关键电源管理",
+                "url": "/products",
+                "image": "",
+                "imageAlt": "",
+                "children": [
+                  {
+                    "id": 35,
+                    "name": "交流不间断电源（UPS）",
+                    "url": "/ups-power-monitor",
+                    "image": "",
+                    "imageAlt": "",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 48,
+        "name": "服务",
+        "url": "/services",
+        "image": "//vcdon.oss-cn-beijing.aliyuncs.com/images/services-featured.jpg",
+        "imageAlt": "",
+        "children": [
+          {
+            "id": 49,
+            "name": "服务内容",
+            "url": "/services-details",
+            "image": "",
+            "imageAlt": "",
+            "children": [
+              {
+                "id": 50,
+                "name": "咨询服务",
+                "url": "/services-details",
+                "image": "",
+                "imageAlt": "",
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+无可展示导航时，`navMenu` 返回空数组（不会是 `null`）：
+```json
+{
+  "code": 0,
+  "message": "操作成功",
+  "data": {
+    "siteConfig": { "...": "..." },
+    "navMenu": []
   }
 }
 ```
@@ -74,11 +151,34 @@
   - `phone` (string): 联系电话
   - `wechatQrCode` (string): 微信二维码图片地址
   - `mpQrCode` (string): 公众号二维码图片地址
+- **`navMenu`** (array): 头部多级导航树，与 `siteConfig` 同级，同一次请求返回。
+  - 节点字段：
+    - `id` (int64): 导航ID
+    - `name` (string): 导航名称
+    - `url` (string): 链接地址
+    - `image` (string): 导航配图地址，未配置时为 `""`
+    - `imageAlt` (string): 配图替代文本，未配置时为 `""`
+    - `children` (array): 子节点，结构与本节点相同；叶子节点固定为 `[]`，不会省略或为 `null`
+  - 数据来源：`hg_web_nav_menu` 表（网站_导航菜单）。导航独立于栏目（`hg_web_channel`）维护，栏目的增删、启用/禁用不会影响导航，反之亦然。目前未提供后台管理页面，导航数据直接在该表维护。
+  - 展示规则：
+    - 只取 `status = 1` 且未软删除（`deleted_at` 为空）的记录；
+    - 只展示从根节点（`pid = 0`）逐级可达的节点：父节点被禁用或软删除时，其整棵子树一并隐藏，不会提升为顶级；
+    - 父节点不存在的孤儿节点、互为父子的闭环节点、自引用节点都不展示；
+    - 同级排序：`sort` 升序，`sort` 相同时按 `id` 升序；
+    - 没有可展示的导航时返回 `[]`；读取导航表失败时整个接口返回错误（提示"获取网站导航失败"）。
+  - 初始化：
+    - 初始化 SQL：`server/storage/data/generate/web_nav_menu.sql`。可重复执行：表不存在时才创建；只有表完全为空（含已软删除的行）时才写入初始数据，不覆盖已有数据。
+    - 初始化脚本：`server/hack/exec_web_nav_menu_schema.go`，在 `server/` 目录下运行：
+      - 不带参数：只读巡检，输出表结构、索引、行数、根节点、孤儿/层级/关系树一致性检查及内容摘要，不改动任何数据；
+      - `-apply`：执行上述 SQL（建表 + 空表写入初始数据）。执行前会校验 SQL 文件只包含预期的建表与写入两条语句，写入前校验现有列结构一致，否则拒绝执行；
+      - `-generate`：仅针对 `hg_web_nav_menu` 调用 `gf gen dao` 生成 dao/entity/do（读取 `hack/config.yaml`），不能与 `-apply` 同时使用。
+    - 现有菜单初始数据：来自 `next_thinkct/config/NavMenu.ts` 的全部有效节点（已排除被注释的节点），共 100 项、5 个根节点（产品、服务、解决方案与行业、支持、新闻中心），ID 为 1~100 且唯一（原文件中的重复 ID 已按前序遍历重新分配），`pid`/`level`/`tree` 依新 ID 重建，最深 4 级；`sort` 保留同级原始顺序，URL 保持原样。
+  - 前端使用（vcdon 主题）：`next_thinkct/config/Site.ts` 的 `getSiteConfig()` 在同一次 `/api/site/index` 请求中读取 `data.navMenu`，挂到 `siteConfig.navMenu`（非数组时按 `[]` 处理），复用站点配置缓存（开发环境 3 秒、生产环境 120 秒重新验证），因此导航数据修改后生产环境最长约 120 秒生效。vcdon 的头部组件读取 `siteConfig.navMenu` 渲染桌面与移动端菜单，空数组时不渲染菜单项。
 
 ### 2.2 获取首页聚合数据
 - **接口路径**: `/api/site/home` 
 - **请求方式**: `GET`
-- **接口说明**: 用于前端网站首页展示产品中心、经典案例和新闻中心等数据。
+- **接口说明**: 用于前端网站首页展示首页轮播、产品中心、经典案例和新闻中心等数据。
 
 #### 2.2.1 请求参数
 - `productsChannelIds` (string): 产品分类栏目ID组或自定义名称(diyname)，英文逗号分隔 (可选，默认 `7,8,9,10,11`)
@@ -94,6 +194,30 @@
   "code": 0,
   "message": "操作成功",
   "data": {
+    "carousels": [
+      {
+        "id": 1,
+        "title": "追求无限可能",
+        "description": "通过我们的数据驱动解决方案实现生产率和可持续发展目标。",
+        "ctaText": "查看我们的实现方式",
+        "ctaLink": "/products",
+        "color": "emerald-blue",
+        "image": "/images/vcdon/slides1.jpg",
+        "alt": "服务器机房中手持 iPad 的女性工作人员",
+        "aspectRatio": "16/9"
+      },
+      {
+        "id": 2,
+        "title": "第十版年度智能制造现状",
+        "description": "为您的数字战略制定基准，探索全球杰出范例，并揭示 2025 年的投资趋势。",
+        "ctaText": "获取报告",
+        "ctaLink": "/news_hy/detail/1",
+        "color": "purple-cyan",
+        "image": "/images/vcdon/slides2.jpg",
+        "alt": "霓虹蓝绿波",
+        "aspectRatio": "3000/884"
+      }
+    ],
     "productsChannels": [
       {
         "id": 2,
@@ -157,6 +281,30 @@
 ```
 
 #### 2.2.3 字段数据来源说明
+- **`carousels`** (array): 首页轮播列表，与 `productsChannels` 等字段同级，始终返回数组；没有可展示的轮播时返回 `[]`，不会为 `null`。上方示例仅列出 2 条，实际按库中启用数据全部返回。
+  - 每项仅包含前台展示字段，不返回 `status`、`sort`、`createdAt`、`updatedAt`、`deletedAt` 等管理字段：
+    - `id` (int): 轮播ID
+    - `title` (string): 标题
+    - `description` (string): 描述文案
+    - `ctaText` (string): 按钮文字
+    - `ctaLink` (string): 按钮链接（站内路径，原样返回）
+    - `color` (string): 配色主题标识，如 `emerald-blue`、`purple-cyan`、`orange-pink`
+    - `image` (string): 图片地址
+    - `alt` (string): 图片替代文本
+    - `aspectRatio` (string): 图片宽高比，如 `16/9`、`3000/884`
+  - 数据来源：`hg_web_carousel` 表（网站_首页轮播），表字段 `cta_text`/`cta_link`/`aspect_ratio` 分别对应 `ctaText`/`ctaLink`/`aspectRatio`，其余同名。目前未提供后台管理页面，轮播数据直接在该表维护。
+  - 展示规则：
+    - 只取 `status = 1`（启用）且未软删除（`deleted_at` 为空）的记录；
+    - 排序：`sort` 升序，`sort` 相同时按 `id` 升序；
+    - 读取轮播表失败时整个接口返回错误（提示"获取首页轮播图失败"）。
+  - 初始化：
+    - 初始化 SQL：`server/storage/data/generate/web_carousel.sql`。可重复执行：表不存在时才创建；只有表完全为空（含已软删除的行）时才写入初始数据，不覆盖已有数据。
+    - 初始化脚本：`server/hack/exec_web_carousel_schema.go`，在 `server/` 目录下运行：
+      - `go run hack/exec_web_carousel_schema.go`（不带参数）：只读巡检，输出表是否存在、列结构及按 `sort,id` 排列的现有行，不改动任何数据；
+      - `go run hack/exec_web_carousel_schema.go -apply`：执行上述 SQL（建表 + 空表写入初始数据）。执行前会校验 SQL 文件只包含预期的建表与写入两条语句，否则拒绝执行；表中已有数据时跳过写入；
+      - `go run hack/exec_web_carousel_schema.go -generate`：仅针对 `hg_web_carousel` 调用 `gf gen dao` 生成 dao/entity/do（读取 `hack/config.yaml`），需与 `-apply` 分开执行，不能同时使用。
+    - 初始数据：来自 `next_thinkct/components/templates/vcdon/home/Carousel.tsx` 原静态 `slides`，共 3 条（ID 1~3，`sort` 1~3，均为启用），字段值保持原样。
+  - 前端使用（vcdon 主题）：首页复用现有的服务端 `/api/site/home` 请求读取 `data.carousels`，不额外发请求、不额外加缓存；非数组时按空处理。0 条时不渲染轮播区域，1 条时静态展示（不显示进度条与播放控制、不自动切换），多条时每 5 秒自动切换。
 - **`productsChannels`**: 取 `web_channel` 表中 ID 包含在 `productsChannelIds` 参数中的分类记录（支持别名），按 `weigh` 与 `id` 排序返回。并包含子频道的关联产品列表数据输出到 `list` 节点中（限制 `productsLimit` 条）。
 - **`casesChannels`**: 根据 `casesChannelIds` 查询对应的栏目详情，并循环关联查询其下及子频道带有图片的经典案例文章列表，按 `weigh` 与 `id` 倒序排列（限制 `casesLimit` 条）。
 - **`newsChannels`**: 根据 `newsChannelIds` 查询对应的栏目详情，并循环关联查询其下及子频道的最新新闻列表，按发布时间 `publish_time` 与 `id` 倒序排列（限制 `newsLimit` 条）。

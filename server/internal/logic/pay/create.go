@@ -9,10 +9,13 @@ package pay
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	v1 "hotgo/api/api/pay/v1"
 	"hotgo/internal/consts"
+	"hotgo/internal/dao"
 	"hotgo/internal/library/contexts"
+	"hotgo/internal/library/hgorm/handler"
 	"hotgo/internal/library/location"
 	"hotgo/internal/library/payment"
 	"hotgo/internal/model/entity"
@@ -92,8 +95,12 @@ func (s *sPay) Create(ctx context.Context, in payin.PayCreateInp) (res *payin.Pa
 		Status:        consts.StatusEnabled,
 	}
 
-	// 创建支付记录
-	if _, err = s.Model(ctx).Data(data).OmitEmptyData().Insert(); err != nil {
+	// 前台用户没有后台角色，充值支付日志不能应用后台 member_id 数据权限过滤。
+	model := s.Model(ctx)
+	if in.OrderGroup == consts.OrderGroupUserRecharge {
+		model = s.Model(ctx, &handler.Option{FilterAuth: false})
+	}
+	if _, err = model.Data(data).OmitEmptyData().Insert(); err != nil {
 		return
 	}
 
@@ -101,6 +108,23 @@ func (s *sPay) Create(ctx context.Context, in payin.PayCreateInp) (res *payin.Pa
 	order, err := payment.New(in.PayType).CreateOrder(ctx, payin.CreateOrderInp{Pay: data})
 	if err != nil {
 		return
+	}
+
+	// 保存原支付单的扫码信息，刷新页面只恢复原单，不再向渠道重复下单。
+	if in.OrderGroup == consts.OrderGroupUserRecharge && order != nil {
+		snapshot, encodeErr := json.Marshal(order)
+		if encodeErr != nil {
+			return nil, gerror.Wrap(encodeErr, "保存充值支付信息失败")
+		}
+		cols := dao.PayLog.Columns()
+		if _, err = dao.PayLog.Ctx(ctx).
+			Where(cols.OutTradeNo, data.OutTradeNo).
+			Where(cols.OrderGroup, consts.OrderGroupUserRecharge).
+			Where(cols.AppId, data.AppId).
+			Where(cols.MemberId, data.MemberId).
+			Data(g.Map{cols.Custom: string(snapshot)}).Update(); err != nil {
+			return nil, gerror.Wrap(err, "保存充值支付信息失败，请在充值记录中核对订单")
+		}
 	}
 
 	res = new(payin.PayCreateModel)

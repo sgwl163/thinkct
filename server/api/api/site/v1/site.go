@@ -1,13 +1,18 @@
 package v1
 
-import "github.com/gogf/gf/v2/frame/g"
+import (
+	"hotgo/internal/model/input/sitein"
+
+	"github.com/gogf/gf/v2/frame/g"
+)
 
 type IndexReq struct {
 	g.Meta `path:"/site/index" method:"get" tags:"前台首页" summary:"获取首页数据"`
 }
 
 type IndexRes struct {
-	SiteConfig g.Map `json:"siteConfig" dc:"网站基础配置"`
+	SiteConfig g.Map                 `json:"siteConfig" dc:"网站基础配置"`
+	NavMenu    []*sitein.NavMenuItem `json:"navMenu" dc:"启用的多级头部导航，无数据时返回空数组"`
 }
 
 type HomeReq struct {
@@ -21,6 +26,7 @@ type HomeReq struct {
 }
 
 type HomeRes struct {
+	Carousels        []*sitein.CarouselItem `json:"carousels" dc:"首页轮播列表，无数据时返回空数组"`
 	ProductsChannels interface{} `json:"productsChannels" dc:"产品中心分类"`
 	CasesChannels    interface{} `json:"casesChannels" dc:"经典案例分类"`
 	NewsChannels     interface{} `json:"newsChannels" dc:"新闻中心分类"`
